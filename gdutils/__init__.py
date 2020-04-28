@@ -150,6 +150,10 @@ class GdacClient(object):
     def last_request(self):
         return self._last_request
 
+    def get_glider_datasets(self, glider):
+
+        return self._datasets_summaries[self._datasets_summaries.glider == glider].reset_index().drop('index', axis=1)
+
     def get_deployments_calendar(self, year=None):
         if not year:
             return self._datasets_days.groupby([lambda x: x.year, lambda x: x.month]).any().sum(axis=1).unstack()
@@ -229,7 +233,7 @@ class GdacClient(object):
                 elif row['dataset_id'].endswith('delayed'):
                     continue
 
-                logging.info('Fetching dataset: {:}'.format(row['dataset_id']))
+                self._logger.info('Fetching dataset: {:}'.format(row['dataset_id']))
 
                 # Get the data download url for erddap_vars
                 try:
@@ -331,7 +335,7 @@ class GdacClient(object):
 
         url = self._client.get_download_url(dataset_id=dataset_id, variables=self._profiles_variables)
 
-        return pd.read_csv(url, parse_dates=True, skiprows=[1], inde_col='time').sort_index()
+        return pd.read_csv(url, parse_dates=True, skiprows=[1], index_col='time').sort_index()
 
     def get_dataset_time_coverage(self, dataset_id):
         """Get the time coverage and wmo id (if specified) for specified dataset_id """
@@ -474,4 +478,4 @@ class GdacClient(object):
     def __repr__(self):
         return "<GdacClient(server='{:}', response='{:}', num_datasets={:})>".format(self._client.server,
                                                                                      self._client.response,
-                                                                                     len(self._datasets))
+                                                                                     len(self._datasets_info))
