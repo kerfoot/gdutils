@@ -210,6 +210,7 @@ class GdacClient(object):
             # Drop the allDatasets row
             self._datasets_info.drop(self._datasets_info[self._datasets_info['Dataset ID'] == 'allDatasets'].index,
                                      inplace=True)
+
             # Reset the index to start and 0
             self._datasets_info.reset_index(inplace=True)
             # Drop the index, griddap wms columns
@@ -218,6 +219,9 @@ class GdacClient(object):
             # rename columns more friendly
             columns = {s: s.replace(' ', '_').lower() for s in self._datasets_info.columns}
             self._datasets_info.rename(columns=columns, inplace=True)
+
+            if not delayedmode:
+                self._datasets_info = self._datasets_info[~self._datasets_info.dataset_id.str.endswith('delayed')]
 
             # Iterate through each data set (except for allDatasets) and grab the info page
             datasets = []
