@@ -1,4 +1,4 @@
-# gdutils
+# gdutils: Glider DAC Utilities
 
 U.S. IOOS Glider Data Assembly Center ERDDAP client that allows you to:
 + Query for datasets
