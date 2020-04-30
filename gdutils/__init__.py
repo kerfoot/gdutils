@@ -471,6 +471,47 @@ class GdacClient(object):
 
         return ax
 
+    def plot_dataset_profiles_calendar(self, dataset_id, **heatmap_kwargs):
+
+        if dataset_id not in self.dataset_ids:
+            self._logger.error('Dataset id {:} not found in {:}'.format(dataset_id, self.__repr__()))
+            return
+
+        profiles = self.get_dataset_profiles(dataset_id)
+        if profiles.empty:
+            self._logger.warning('No profiles found for dataset: {:}'.format(dataset_id))
+            return
+
+        pgroup = profiles.latitude.groupby([lambda x: x.year, lambda x: x.month, lambda x: x.day]).count()
+        calendar = pgroup.unstack()
+
+        annotate = True
+        square = True
+        cbar = False
+        annot_kws = {'fontsize': 10}
+        annot_kws = {}
+
+        fig = plt.figure(figsize=(11, 8.5))
+
+        ax = sns.heatmap(calendar, annot=annotate, fmt='.0f', square=square, cbar=cbar, linewidths=0.5,
+                         annot_kws=annot_kws)
+
+        # Format default y-tick labels to 'mmm YYYY'
+        ylabels = [y.get_text() for y in ax.get_yticklabels()]
+        new_ylabels = []
+        for ylabel in ylabels:
+            y, m = ylabel.split('-')
+            new_ylabels.append('{:} {:}'.format(self._months[int(m) - 1][0:3], y))
+        ax.set_yticklabels(new_ylabels)
+
+        ax.set_ylabel('')
+        ax.invert_yaxis()
+        _ = [ytick.set_rotation(0) for ytick in ax.get_yticklabels()]
+
+        ax.set_title('Profiles: {:}'.format(dataset_id))
+
+        return ax
+
     @staticmethod
     def encode_url(data_url):
         """Percent encode special url characters."""
