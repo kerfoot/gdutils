@@ -472,7 +472,7 @@ class GdacClient(object):
         return ax
 
     def plot_dataset_profiles_calendar(self, dataset_id, **heatmap_kwargs):
-
+        """Plot the heatmap profiles/day calendar for the specified dataset"""
         if dataset_id not in self.dataset_ids:
             self._logger.error('Dataset id {:} not found in {:}'.format(dataset_id, self.__repr__()))
             return
