@@ -5,4 +5,6 @@ U.S. IOOS Glider Data Assembly Center ERDDAP client that allows you to:
 + Plot datasets/server statistics
 + Select time-series data
 
+# [Quick Start Guide](https://github.com/kerfoot/gdutils/wiki/Quick-Start-Guide)
+
 Built with the python [erddapy](https://ioos.github.io/erddapy/), [pandas](https://pandas.pydata.org/) and [seaborn](http://seaborn.pydata.org/) packages.
