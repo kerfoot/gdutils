@@ -64,12 +64,17 @@ class GdacClient(object):
                                 'profiles']
 
     @property
-    def datasets_info(self):
-        return self._datasets_info
+    def datasets(self):
+        return self._datasets_summaries.set_index('dataset_id').join(
+            self._datasets_info.set_index('dataset_id')).reset_index()
 
-    @property
-    def datasets_summaries(self):
-        return self._datasets_summaries
+    # @property
+    # def datasets_info(self):
+    #     return self._datasets_info
+    #
+    # @property
+    # def datasets_summaries(self):
+    #     return self._datasets_summaries
 
     @property
     def datasets_profiles(self):
@@ -242,7 +247,7 @@ class GdacClient(object):
                 # Get the data download url for erddap_vars
                 try:
                     data_url = self._client.get_download_url(dataset_id=row['dataset_id'],
-                                                         variables=self._profiles_variables)
+                                                             variables=self._profiles_variables)
                 except (ConnectionError, ConnectionRefusedError, urllib3.exceptions.MaxRetryError) as e:
                     self._logger.error('{:} fetch failed: {:}'.format(row['dataset_id'], e))
                     continue
