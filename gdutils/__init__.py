@@ -157,7 +157,7 @@ class GdacClient(object):
 
     def get_glider_datasets(self, glider):
 
-        return self._datasets_summaries[self._datasets_summaries.glider == glider].reset_index().drop('index', axis=1)
+        return self.datasets[self.datasets.glider == glider].reset_index().drop('index', axis=1)
 
     def get_deployments_calendar(self, year=None):
         if not year:
@@ -374,7 +374,7 @@ class GdacClient(object):
         if not isinstance(variables, list):
             variables = [variables]
 
-        all_variables = ['precise_time', 'time', 'depth'] + variables
+        all_variables = ['precise_time', 'depth'] + variables
         variables = set(all_variables)
 
         constraints = {}
