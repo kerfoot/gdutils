@@ -1,3 +1,7 @@
-*.pyc
+*.egg-info/
 *.profraw
+*.pyc
 .idea
+build
+dist
+gdutils/_version.py

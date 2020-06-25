@@ -1,0 +1,16 @@
+include *.txt
+include LICENSE
+include pyproject.toml
+
+graft gdutils
+
+prune img
+prune docs
+prune tests
+prune notebooks
+prune *.egg-info
+
+exclude *.yml
+exclude *.enc
+exclude .gitignore
+exclude .isort.cfg
