@@ -3,6 +3,7 @@ from erddapy import ERDDAP
 import pandas as pd
 import os
 import re
+import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from math import ceil
@@ -161,19 +162,25 @@ class GdacClient(object):
 
     def get_deployments_calendar(self, year=None):
         if not year:
-            return self._datasets_days.groupby([lambda x: x.year, lambda x: x.month]).any().sum(axis=1).unstack()
+            ds = self._datasets_days.groupby([lambda x: x.year, lambda x: x.month]).any().sum(axis=1).unstack()
         else:
             glider_days_by_yymmdd = self._datasets_days
             years = pd.to_datetime(glider_days_by_yymmdd.index).year.unique()
             if year not in years:
                 self._logger.warning('No glider days found in year {:}'.format(year))
                 return pd.DataFrame()
-            return glider_days_by_yymmdd[pd.to_datetime(glider_days_by_yymmdd.index).year == year].groupby(
+            ds = glider_days_by_yymmdd[pd.to_datetime(glider_days_by_yymmdd.index).year == year].groupby(
                 [lambda x: x.month, lambda x: x.day]).any().sum(axis=1).unstack()
+
+        for m in np.arange(1, 13):
+            if m not in ds.columns:
+                ds[m] = np.nan
+
+        return ds.sort_index(axis=1)
 
     def get_glider_days_calendar(self, year=None):
         if not year:
-            return self._datasets_days.sum(axis=1).groupby(
+            ds = self._datasets_days.sum(axis=1).groupby(
                 [lambda x: x.year, lambda x: x.month]).sum().unstack()
         else:
             glider_days_by_yymmdd = self._datasets_days.sum(axis=1)
@@ -181,12 +188,18 @@ class GdacClient(object):
             if year not in years:
                 self._logger.warning('No glider days found in year {:}'.format(year))
                 return pd.DataFrame()
-            return glider_days_by_yymmdd[pd.to_datetime(glider_days_by_yymmdd.index).year == year].groupby(
+            ds = glider_days_by_yymmdd[pd.to_datetime(glider_days_by_yymmdd.index).year == year].groupby(
                 [lambda x: x.month, lambda x: x.day]).sum().unstack()
+
+        for m in np.arange(1, 13):
+            if m not in ds.columns:
+                ds[m] = np.nan
+
+        return ds.sort_index(axis=1)
 
     def get_profiles_calendar(self, year=None):
         if not year:
-            return self._datasets_profiles.sum(axis=1).groupby(
+            ds = self._datasets_profiles.sum(axis=1).groupby(
                 [lambda x: x.year, lambda x: x.month]).sum().unstack()
         else:
             profiles_by_yymmdd = self._datasets_profiles.sum(axis=1)
@@ -194,8 +207,14 @@ class GdacClient(object):
             if year not in years:
                 self._logger.warning('No profiles found in year {:}'.format(year))
                 return pd.DataFrame()
-            return profiles_by_yymmdd[pd.to_datetime(profiles_by_yymmdd.index).year == year].groupby(
+            ds = profiles_by_yymmdd[pd.to_datetime(profiles_by_yymmdd.index).year == year].groupby(
                 [lambda x: x.month, lambda x: x.day]).sum().unstack()
+
+        for m in np.arange(1, 13):
+            if m not in ds.columns:
+                ds[m] = np.nan
+
+        return ds.sort_index(axis=1)
 
     def search_datasets(self, search_for=None, delayedmode=False, **kwargs):
         """Search the ERDDAP server for glider deployment datasets.  Results are stored as pandas DataFrames in:
