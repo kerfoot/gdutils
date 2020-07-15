@@ -32,6 +32,7 @@ class GdacClient(object):
         self._datasets_summaries = pd.DataFrame()
         self._datasets_profiles = pd.DataFrame()
         self._datasets_days = pd.DataFrame()
+        self._daily_profile_positions = pd.DataFrame()
 
         self._profiles_variables = ['time', 'latitude', 'longitude', 'profile_id', 'wmo_id']
 
@@ -69,13 +70,9 @@ class GdacClient(object):
         return self._datasets_summaries.set_index('dataset_id').join(
             self._datasets_info.set_index('dataset_id')).reset_index()
 
-    # @property
-    # def datasets_info(self):
-    #     return self._datasets_info
-    #
-    # @property
-    # def datasets_summaries(self):
-    #     return self._datasets_summaries
+    @property
+    def daily_profile_positions(self):
+        return self._daily_profile_positions
 
     @property
     def datasets_profiles(self):
@@ -110,6 +107,65 @@ class GdacClient(object):
         return self._datasets_profiles.sum(axis=1).groupby(lambda x: x.year).sum()
 
     @property
+    def ymd_profiles_calendar(self):
+        calendar = self.profiles_per_yyyymmdd.groupby(
+            [lambda x: x.year, lambda x: x.month, lambda x: x.day]).sum().unstack()
+
+        # Fill in the missing (yyyy,mm) indices
+        years = np.arange(calendar.index.levels[0].min(), calendar.index.levels[0].max() + 1)
+        months = np.arange(calendar.index.levels[1].min(), calendar.index.levels[1].max() + 1)
+
+        calendar.reindex(pd.MultiIndex.from_product([years, months]))
+
+        for d in np.arange(1, 32):
+            if d not in calendar.columns:
+                calendar[d] = np.nan
+
+        calendar.sort_index(axis=1, inplace=True)
+
+        calendar.index.set_names(['year', 'month'], inplace=True)
+        calendar.columns.set_names('day', inplace=True)
+
+        return calendar
+
+    @property
+    def ym_profiles_calendar(self):
+        calendar = self.profiles_per_yyyymmdd.groupby([lambda x: x.year, lambda x: x.month]).sum().unstack()
+
+        # Fill in the missing year indices
+        years = np.arange(calendar.index.min(), calendar.index.max() + 1)
+        calendar.reindex(pd.Index(years))
+
+        for d in np.arange(1, 13):
+            if d not in calendar.columns:
+                calendar[d] = np.nan
+
+        calendar.sort_index(axis=1, inplace=True)
+
+        calendar.index.set_names('year', inplace=True)
+        calendar.columns.set_names('month', inplace=True)
+
+        return calendar
+
+    @property
+    def md_profiles_calendar(self):
+        calendar = self.profiles_per_yyyymmdd.groupby([lambda x: x.month, lambda x: x.day]).sum().unstack()
+
+        # Fill in the missing month indices
+        calendar.reindex(pd.Index(np.arange(1, 13)))
+
+        for d in np.arange(1, 32):
+            if d not in calendar.columns:
+                calendar[d] = np.nan
+
+        calendar.sort_index(axis=1, inplace=True)
+
+        calendar.index.set_names('month', inplace=True)
+        calendar.columns.set_names('day', inplace=True)
+
+        return calendar
+
+    @property
     def glider_days_per_yyyymmdd(self):
         return self._datasets_days.sum(axis=1)
 
@@ -118,12 +174,138 @@ class GdacClient(object):
         return self._datasets_days.sum(axis=1).groupby(lambda x: x.year).sum()
 
     @property
+    def ymd_glider_days_calendar(self):
+        # calendar = self.glider_days_per_yyyymmdd.groupby(
+        #     [lambda x: x.year, lambda x: x.month, lambda x: x.day]).sum().unstack()
+        calendar = self._datasets_days.sum(axis=1).groupby(
+            [lambda x: x.year, lambda x: x.month, lambda x: x.day]).sum().unstack()
+
+        # Fill in the missing (yyyy,mm) indices
+        years = np.arange(calendar.index.levels[0].min(), calendar.index.levels[0].max() + 1)
+        months = np.arange(calendar.index.levels[1].min(), calendar.index.levels[1].max() + 1)
+
+        calendar.reindex(pd.MultiIndex.from_product([years, months]))
+
+        for d in np.arange(1, 32):
+            if d not in calendar.columns:
+                calendar[d] = np.nan
+
+        calendar.sort_index(axis=1, inplace=True)
+
+        calendar.index.set_names(['year', 'month'], inplace=True)
+        calendar.columns.set_names('day', inplace=True)
+
+        return calendar
+
+    @property
+    def ym_glider_days_calendar(self):
+        # calendar = self.glider_days_per_yyyymmdd.groupby([lambda x: x.year, lambda x: x.month]).sum().unstack()
+        calendar = self._datasets_days.sum(axis=1).groupby([lambda x: x.year, lambda x: x.month]).sum().unstack()
+
+        # Fill in the missing year indices
+        years = np.arange(calendar.index.min(), calendar.index.max() + 1)
+        calendar.reindex(pd.Index(years))
+
+        for d in np.arange(1, 13):
+            if d not in calendar.columns:
+                calendar[d] = np.nan
+
+        calendar.sort_index(axis=1, inplace=True)
+
+        calendar.index.set_names('year', inplace=True)
+        calendar.columns.set_names('month', inplace=True)
+
+        return calendar
+
+    @property
+    def md_glider_days_calendar(self):
+        # calendar = self.glider_days_per_yyyymmdd.groupby([lambda x: x.month, lambda x: x.day]).sum().unstack()
+        calendar = self._datasets_days.sum(axis=1).groupby([lambda x: x.month, lambda x: x.day]).sum().unstack()
+
+        # Fill in the missing month indices
+        calendar.reindex(pd.Index(np.arange(1, 13)))
+
+        for d in np.arange(1, 32):
+            if d not in calendar.columns:
+                calendar[d] = np.nan
+
+        calendar.sort_index(axis=1, inplace=True)
+
+        calendar.index.set_names('month', inplace=True)
+        calendar.columns.set_names('day', inplace=True)
+
+        return calendar
+
+    @property
     def deployments_per_yyyymmdd(self):
         return self._datasets_days.sum(axis=1)
 
     @property
     def deployments_per_year(self):
         return self._datasets_days.groupby(lambda x: x.year).any().sum(axis=1)
+
+    @property
+    def ymd_deployments_calendar(self):
+        # calendar = self.deployments_per_yyyymmdd.groupby(
+        #     [lambda x: x.year, lambda x: x.month, lambda x: x.day]).sum().unstack()
+        calendar = self._datasets_days.groupby([lambda x: x.year, lambda x: x.month, lambda x: x.day]).any().sum(
+            axis=1).unstack()
+
+        # Fill in the missing (yyyy,mm) indices
+        years = np.arange(calendar.index.levels[0].min(), calendar.index.levels[0].max() + 1)
+        months = np.arange(calendar.index.levels[1].min(), calendar.index.levels[1].max() + 1)
+
+        calendar.reindex(pd.MultiIndex.from_product([years, months]))
+
+        for d in np.arange(1, 32):
+            if d not in calendar.columns:
+                calendar[d] = np.nan
+
+        calendar.sort_index(axis=1, inplace=True)
+
+        calendar.index.set_names(['year', 'month'], inplace=True)
+        calendar.columns.set_names('day', inplace=True)
+
+        return calendar
+
+    @property
+    def ym_deployments_calendar(self):
+        # calendar = self.deployments_per_yyyymmdd.groupby([lambda x: x.year, lambda x: x.month]).sum().unstack()
+        calendar = self._datasets_days.groupby([lambda x: x.year, lambda x: x.month]).any().sum(axis=1).unstack()
+
+        # Fill in the missing year indices
+        years = np.arange(calendar.index.min(), calendar.index.max() + 1)
+        calendar.reindex(pd.Index(years))
+
+        for d in np.arange(1, 13):
+            if d not in calendar.columns:
+                calendar[d] = np.nan
+
+        calendar.sort_index(axis=1, inplace=True)
+
+        calendar.index.set_names('year', inplace=True)
+        calendar.columns.set_names('month', inplace=True)
+
+        return calendar
+
+    @property
+    def md_deployments_calendar(self):
+        # calendar = self.deployments_per_yyyymmdd.groupby([lambda x: x.month, lambda x: x.day]).sum().unstack()
+        calendar = self._datasets_days.groupby([lambda x: x.month, lambda x: x.day]).any().sum(axis=1).unstack()
+
+        # Fill in the missing month indices
+        calendar.reindex(pd.Index(np.arange(1, 13)))
+
+        for d in np.arange(1, 32):
+            if d not in calendar.columns:
+                calendar[d] = np.nan
+
+        calendar.sort_index(axis=1, inplace=True)
+
+        calendar.index.set_names('month', inplace=True)
+        calendar.columns.set_names('day', inplace=True)
+
+        return calendar
 
     @property
     def yearly_counts(self):
@@ -160,63 +342,7 @@ class GdacClient(object):
 
         return self.datasets[self.datasets.glider == glider].reset_index().drop('index', axis=1)
 
-    def get_deployments_calendar(self, year=None):
-        if not year:
-            ds = self._datasets_days.groupby([lambda x: x.year, lambda x: x.month]).any().sum(axis=1).unstack()
-        else:
-            glider_days_by_yymmdd = self._datasets_days
-            years = pd.to_datetime(glider_days_by_yymmdd.index).year.unique()
-            if year not in years:
-                self._logger.warning('No glider days found in year {:}'.format(year))
-                return pd.DataFrame()
-            ds = glider_days_by_yymmdd[pd.to_datetime(glider_days_by_yymmdd.index).year == year].groupby(
-                [lambda x: x.month, lambda x: x.day]).any().sum(axis=1).unstack()
-
-        for m in np.arange(1, 13):
-            if m not in ds.columns:
-                ds[m] = np.nan
-
-        return ds.sort_index(axis=1)
-
-    def get_glider_days_calendar(self, year=None):
-        if not year:
-            ds = self._datasets_days.sum(axis=1).groupby(
-                [lambda x: x.year, lambda x: x.month]).sum().unstack()
-        else:
-            glider_days_by_yymmdd = self._datasets_days.sum(axis=1)
-            years = pd.to_datetime(glider_days_by_yymmdd.index).year.unique()
-            if year not in years:
-                self._logger.warning('No glider days found in year {:}'.format(year))
-                return pd.DataFrame()
-            ds = glider_days_by_yymmdd[pd.to_datetime(glider_days_by_yymmdd.index).year == year].groupby(
-                [lambda x: x.month, lambda x: x.day]).sum().unstack()
-
-        for m in np.arange(1, 13):
-            if m not in ds.columns:
-                ds[m] = np.nan
-
-        return ds.sort_index(axis=1)
-
-    def get_profiles_calendar(self, year=None):
-        if not year:
-            ds = self._datasets_profiles.sum(axis=1).groupby(
-                [lambda x: x.year, lambda x: x.month]).sum().unstack()
-        else:
-            profiles_by_yymmdd = self._datasets_profiles.sum(axis=1)
-            years = pd.to_datetime(profiles_by_yymmdd.index).year.unique()
-            if year not in years:
-                self._logger.warning('No profiles found in year {:}'.format(year))
-                return pd.DataFrame()
-            ds = profiles_by_yymmdd[pd.to_datetime(profiles_by_yymmdd.index).year == year].groupby(
-                [lambda x: x.month, lambda x: x.day]).sum().unstack()
-
-        for m in np.arange(1, 13):
-            if m not in ds.columns:
-                ds[m] = np.nan
-
-        return ds.sort_index(axis=1)
-
-    def search_datasets(self, search_for=None, delayedmode=False, **kwargs):
+    def search_datasets(self, search_for=None, params={}):
         """Search the ERDDAP server for glider deployment datasets.  Results are stored as pandas DataFrames in:
 
         self.deployments
@@ -225,7 +351,7 @@ class GdacClient(object):
         Equivalent to ERDDAP's Advanced Search.  Searches can be performed by free text, bounding box, time bounds, etc.
         See the erddapy documentation for valid kwargs"""
 
-        url = self._client.get_search_url(search_for=search_for, **kwargs)
+        url = self._client.get_search_url(search_for=search_for, **params)
         self._last_request = url
 
         glider_regex = re.compile(r'^(.*)-\d{8}T\d{4}')
@@ -244,22 +370,22 @@ class GdacClient(object):
             columns = {s: s.replace(' ', '_').lower() for s in self._datasets_info.columns}
             self._datasets_info.rename(columns=columns, inplace=True)
 
-            if not delayedmode:
-                self._datasets_info = self._datasets_info[~self._datasets_info.dataset_id.str.endswith('delayed')]
+            self._datasets_info = self._datasets_info[~self._datasets_info.dataset_id.str.endswith('delayed')]
 
             # Iterate through each data set (except for allDatasets) and grab the info page
             datasets = []
             daily_profiles = []
             datasets_days = []
+            avg_profile_pos = []
             for i, row in self._datasets_info.iterrows():
 
                 if row['dataset_id'] == 'allDatasets':
                     continue
 
-                if delayedmode and not row['dataset_id'].endswith('delayed'):
-                    continue
-                elif row['dataset_id'].endswith('delayed'):
-                    continue
+                # if delayedmode and not row['dataset_id'].endswith('delayed'):
+                #     continue
+                # elif row['dataset_id'].endswith('delayed'):
+                #     continue
 
                 self._logger.info('Fetching dataset: {:}'.format(row['dataset_id']))
 
@@ -278,9 +404,20 @@ class GdacClient(object):
                     self._logger.error('Failed to fetch profiles: {:}'.format(e))
                     continue
 
-                # Group profiles by yyyy-mm-dd and sum the number of profiles per day
-                s = profiles.profile_id.dropna().groupby(lambda x: x.date).count()
+                # Group the profile by date, average the latitude and longitude and get a daily count
+                profile_stats = profiles.groupby(lambda x: x.date).agg(
+                    {'latitude': 'mean', 'longitude': 'mean', 'profile_id': 'size'}).rename(
+                    columns={'profile_id': 'num_profiles'})
+                profile_stats['dataset_id'] = row.dataset_id
+
+                s = profile_stats.num_profiles
                 s.name = row['dataset_id']
+
+                avg_profile_pos.append(profile_stats[['dataset_id', 'latitude', 'longitude']])
+
+                # # Group profiles by yyyy-mm-dd and sum the number of profiles per day
+                # s = profiles.profile_id.dropna().groupby(lambda x: x.date).count()
+                # s.name = row['dataset_id']
                 daily_profiles.append(s)
 
                 # Create the deployment date range
@@ -337,6 +474,9 @@ class GdacClient(object):
             # Create and store the DataFrame containing the number of profiles on each day for each deployment
             self._datasets_profiles = pd.concat(daily_profiles, axis=1).sort_index()
 
+            self._daily_profile_positions = pd.concat(avg_profile_pos, axis=0).reset_index().rename(
+                columns={'index': 'date'})
+
         except HTTPError as e:
             self._logger.error(e)
 
@@ -353,13 +493,80 @@ class GdacClient(object):
         info.reset_index(inplace=True)
         return info.drop('index', axis=1).transpose()
 
+    def get_dataset_ymd_profiles_calendar(self, dataset_id):
+
+        dataset_profiles = self.get_dataset_profiles(dataset_id)
+
+        calendar = dataset_profiles.dropna().iloc[:, 0].groupby(
+            [lambda x: x.year, lambda x: x.month, lambda x: x.day]).count().unstack()
+
+        # Fill in the missing (yyyy,mm) indices
+        years = np.arange(calendar.index.levels[0].min(), calendar.index.levels[0].max() + 1)
+        months = np.arange(calendar.index.levels[1].min(), calendar.index.levels[1].max() + 1)
+
+        calendar.reindex(pd.MultiIndex.from_product([years, months]))
+
+        for d in np.arange(1, 32):
+            if d not in calendar.columns:
+                calendar[d] = np.nan
+
+        calendar.sort_index(axis=1, inplace=True)
+
+        calendar.index.set_names(['year', 'month'], inplace=True)
+        calendar.columns.set_names('day', inplace=True)
+
+        return calendar
+
+    def get_dataset_ym_profiles_calendar(self, dataset_id):
+
+        dataset_profiles = self.get_dataset_profiles(dataset_id)
+
+        calendar = dataset_profiles.dropna().iloc[:, 0].groupby(
+            [lambda x: x.year, lambda x: x.month]).count().unstack()
+
+        # Fill in the missing year indices
+        years = np.arange(calendar.index.min(), calendar.index.max() + 1)
+        calendar.reindex(pd.Index(years))
+
+        for d in np.arange(1, 13):
+            if d not in calendar.columns:
+                calendar[d] = np.nan
+
+        calendar.sort_index(axis=1, inplace=True)
+
+        calendar.index.set_names('year', inplace=True)
+        calendar.columns.set_names('month', inplace=True)
+
+        return calendar
+
+    def get_dataset_md_profiles_calendar(self, dataset_id):
+
+        dataset_profiles = self.get_dataset_profiles(dataset_id)
+
+        calendar = dataset_profiles.dropna().iloc[:, 0].groupby(
+            [lambda x: x.month, lambda x: x.day]).count().unstack()
+
+        # Fill in the missing month indices
+        calendar.reindex(pd.Index(np.arange(1, 13)))
+
+        for d in np.arange(1, 32):
+            if d not in calendar.columns:
+                calendar[d] = np.nan
+
+        calendar.sort_index(axis=1, inplace=True)
+
+        calendar.index.set_names('month', inplace=True)
+        calendar.columns.set_names('day', inplace=True)
+
+        return calendar
+
     def get_dataset_profiles(self, dataset_id):
         """Fetch all profiles (time, latitude, longitude, profile_id) for the specified dataset.  Profiles are sorted
         by ascending time"""
 
         if dataset_id not in self.dataset_ids:
             self._logger.error('Dataset id {:} not found in {:}'.format(dataset_id, self.__repr__()))
-            return
+            return pd.DataFrame()
 
         url = self._client.get_download_url(dataset_id=dataset_id, variables=self._profiles_variables)
 
@@ -435,106 +642,6 @@ class GdacClient(object):
             ax.set_title('U.S. IOOS Glider Data Assembly Center')
 
             return ax.figure, ax
-
-    def plot_datasets_calendar(self, calendar_type, year=None, cmap=None):
-        """Heatmap of the specified calendar_type"""
-        if calendar_type not in self._calendar_types:
-            self._logger.error('Invalid calendar type specified: {:}'.format(calendar_type))
-            return
-
-        if calendar_type == 'datasets':
-            if not year:
-                data = self.get_deployments_calendar()
-                title = 'Active Real-Time Datasets'
-            else:
-                data = self.get_deployments_calendar(year)
-                title = 'Active Real-Time Datasets: {:}'.format(year)
-        elif calendar_type == 'days':
-            if not year:
-                data = self.get_glider_days_calendar()
-                data.columns = self._months
-                title = 'Glider In-Water Days'
-            else:
-                data = self.get_glider_days_calendar(year)
-                title = 'Glider In-Water Days: {:}'.format(year)
-        elif calendar_type == 'profiles':
-            if not year:
-                data = self.get_profiles_calendar()
-                data.columns = self._months
-                title = 'Real-Time Profiles'
-            else:
-                data = self.get_profiles_calendar(year)
-                title = 'Real-Time Profiles: {:}'.format(year)
-        else:
-            self._logger.error('Unknown calendar type: {:}'.format(calendar_type))
-            return
-
-        if data.empty:
-            self._logger.warning('No results found')
-            return
-
-        if year:
-            data.index = self._months
-            plt.figure(figsize=(8.5, 4.))
-            cb = True
-            annotate = False
-        else:
-            data.columns = self._months
-            plt.figure(figsize=(8.5, 8.5))
-            cb = False
-            annotate = True
-
-        if cmap:
-            ax = sns.heatmap(data, annot=annotate, fmt='.0f', square=True, cbar=cb, linewidths=0.5, cmap=cmap)
-        else:
-            ax = sns.heatmap(data, annot=annotate, fmt='.0f', square=True, cbar=cb, linewidths=0.5)
-
-        ax.invert_yaxis()
-        _ = [ytick.set_rotation(0) for ytick in ax.get_yticklabels()]
-        ax.set_title(title)
-
-        return ax
-
-    def plot_dataset_profiles_calendar(self, dataset_id, **heatmap_kwargs):
-        """Plot the heatmap profiles/day calendar for the specified dataset"""
-        if dataset_id not in self.dataset_ids:
-            self._logger.error('Dataset id {:} not found in {:}'.format(dataset_id, self.__repr__()))
-            return
-
-        profiles = self.get_dataset_profiles(dataset_id)
-        if profiles.empty:
-            self._logger.warning('No profiles found for dataset: {:}'.format(dataset_id))
-            return
-
-        pgroup = profiles.latitude.groupby([lambda x: x.year, lambda x: x.month, lambda x: x.day]).count()
-        calendar = pgroup.unstack()
-
-        annotate = True
-        square = True
-        cbar = False
-        annot_kws = {'fontsize': 10}
-        annot_kws = {}
-
-        fig = plt.figure(figsize=(11, 8.5))
-
-        ax = sns.heatmap(calendar, annot=annotate, fmt='.0f', square=square, cbar=cbar, linewidths=0.5,
-                         annot_kws=annot_kws)
-
-        # Format default y-tick labels to 'mmm YYYY'
-        ylabels = [y.get_text() for y in ax.get_yticklabels()]
-        new_ylabels = []
-        for ylabel in ylabels:
-            y, m = ylabel.split('-')
-            new_ylabels.append('{:} {:}'.format(self._months[int(m) - 1][0:3], y))
-        ax.set_yticklabels(new_ylabels)
-
-        ax.set_ylabel('')
-        ax.invert_yaxis()
-        _ = [ytick.set_rotation(0) for ytick in ax.get_yticklabels()]
-
-        ax.set_title('Profiles: {:}'.format(dataset_id))
-
-        return ax
 
     @staticmethod
     def encode_url(data_url):
