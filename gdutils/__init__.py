@@ -399,6 +399,7 @@ class GdacClient(object):
 
                 # Fetch the profiles into a pandas dataframe
                 try:
+                    self._logger.debug('GDAC request url: {:}'.format(data_url))
                     profiles = pd.read_csv(data_url, skiprows=[1], index_col='time', parse_dates=True).sort_index()
                 except HTTPError as e:
                     self._logger.error('Failed to fetch profiles: {:}'.format(e))
