@@ -3,6 +3,7 @@ from erddapy import ERDDAP
 import pandas as pd
 import os
 import re
+import json
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -10,6 +11,7 @@ from math import ceil
 from urllib.parse import urlsplit, urlunsplit, quote
 from requests.exceptions import HTTPError, ConnectionError
 import urllib3.exceptions
+from decimal import *
 
 
 class GdacClient(object):
@@ -644,15 +646,54 @@ class GdacClient(object):
 
             return ax.figure, ax
 
-    @staticmethod
-    def encode_url(data_url):
-        """Percent encode special url characters."""
-        url_pieces = list(urlsplit(data_url))
-        url_pieces[3] = quote(url_pieces[3])
+    def export_dataset_daily_tracks(self, output_directory, precision='0.001'):
+        """Export geoJson LineString tracks containing an daily averaged GPS position for each dataset contained in
+        self.datasets. The json files are written to output_directory, which must be a valid path."""
 
-        return urlunsplit(url_pieces)
+        if not os.path.isdir(output_directory):
+            logging.error('Output directory does not exist: {:}'.format(output_directory))
+            return
 
-    def __repr__(self):
-        return "<GdacClient(server='{:}', response='{:}', num_datasets={:})>".format(self._client.server,
-                                                                                     self._client.response,
-                                                                                     len(self._datasets_info))
+        for dataset_id in self.dataset_ids:
+
+            dataset_gps = self._daily_profile_positions[self.daily_profile_positions.dataset_id == dataset_id]
+            if dataset_gps.empty:
+                logging.warning('No daily GPS positions found for dataset ID: {:}'.format(dataset_id))
+                continue
+
+            bbox = [float(Decimal(dataset_gps.longitude.min()).quantize(Decimal(precision), rounding=ROUND_HALF_DOWN)),
+                    float(Decimal(dataset_gps.latitude.min()).quantize(Decimal(precision), rounding=ROUND_HALF_DOWN)),
+                    float(Decimal(dataset_gps.longitude.max()).quantize(Decimal(precision), rounding=ROUND_HALF_DOWN)),
+                    float(Decimal(dataset_gps.latitude.max()).quantize(Decimal(precision), rounding=ROUND_HALF_DOWN))]
+            track = {'type': 'Feature',
+                     'bbox': bbox,
+                     'geometry': {'type': 'LineString',
+                                  'coordinates': [
+                                      [float(Decimal(pos.longitude).quantize(Decimal(precision),
+                                                                             rounding=ROUND_HALF_DOWN)),
+                                       float(Decimal(pos.latitude).quantize(Decimal(precision),
+                                                                            rounding=ROUND_HALF_DOWN))]
+                                      for i, pos in dataset_gps.iterrows()]},
+                     'properties': {'dataset_id': dataset_id}
+                     }
+
+            json_path = os.path.join(output_directory, '{:}_track.json'.format(dataset_id))
+            with open(json_path, 'w') as fid:
+                json.dump(track, fid)
+
+        return
+
+
+@staticmethod
+def encode_url(data_url):
+    """Percent encode special url characters."""
+    url_pieces = list(urlsplit(data_url))
+    url_pieces[3] = quote(url_pieces[3])
+
+    return urlunsplit(url_pieces)
+
+
+def __repr__(self):
+    return "<GdacClient(server='{:}', response='{:}', num_datasets={:})>".format(self._client.server,
+                                                                                 self._client.response,
+                                                                                 len(self._datasets_info))
