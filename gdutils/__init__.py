@@ -8,6 +8,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from math import ceil
+import urllib
 from urllib.parse import urlsplit, urlunsplit, quote
 from requests.exceptions import HTTPError, ConnectionError
 import urllib3.exceptions
@@ -69,6 +70,9 @@ class GdacClient(object):
 
     @property
     def datasets(self):
+        if self._datasets_summaries.empty:
+            return pd.DataFrame()
+
         return self._datasets_summaries.set_index('dataset_id').join(
             self._datasets_info.set_index('dataset_id')).reset_index()
 
@@ -573,7 +577,11 @@ class GdacClient(object):
 
         url = self._client.get_download_url(dataset_id=dataset_id, variables=self._profiles_variables)
 
-        return pd.read_csv(url, parse_dates=True, skiprows=[1], index_col='time').sort_index()
+        try:
+            return pd.read_csv(url, parse_dates=True, skiprows=[1], index_col='time').sort_index()
+        except urllib.error.HTTPError as e:
+            self._logger.error('Request: {:}'.format(url))
+            return pd.DataFrame()
 
     def get_dataset_time_coverage(self, dataset_id):
         """Get the time coverage and wmo id (if specified) for specified dataset_id """
