@@ -4,11 +4,13 @@ channels:
   - defaults
 dependencies:
   - brotlipy=0.7.0=py38h64e0658_1000
-  - ca-certificates=2020.1.1=0
+  - ca-certificates=2020.6.20=hecda079_0
   - cartopy=0.17.0=py38h9bcff04_1015
-  - certifi=2020.4.5.1=py38_0
+  - certifi=2020.6.20=py38h32f6830_0
   - cffi=1.14.0=py38h356ff06_0
   - chardet=3.0.4=py38h32f6830_1006
+  - cmocean=2.0=py_3
+  - colorspacious=1.1.2=pyh24bf2e0_0
   - cryptography=2.8=py38hb761dab_2
   - cycler=0.10.0=py_2
   - erddapy=0.5.3=py_0
@@ -38,7 +40,7 @@ dependencies:
   - ncurses=6.1=h0a44026_1002
   - numpy=1.18.1=py38h1f821a2_1
   - olefile=0.46=py_0
-  - openssl=1.1.1g=h1de35cc_0
+  - openssl=1.1.1g=h0b31af3_0
   - owslib=0.19.2=py_1
   - pandas=1.0.3=py38h5fc983b_1
   - pillow=7.1.1=py38h83dc5e5_0
