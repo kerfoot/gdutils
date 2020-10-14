@@ -18,10 +18,10 @@ month_labels = ['January',
                 'December']
 
 
-def plot_calendar(calendar, **hm_kwargs):
+def plot_calendar(calendar, center=None, **hm_kwargs):
     """Plot heatmap calendar"""
     if not calendar.columns.name:
-        logging.error('Unknown calendar columns type')
+        logging.warning('Unknown calendar columns type')
         return
 
     fontsize = 10.
@@ -44,7 +44,10 @@ def plot_calendar(calendar, **hm_kwargs):
                       'annot_kws': {'fontsize': fontsize}}
     heatmap_kwargs.update(hm_kwargs)
 
-    ax = sns.heatmap(calendar, **heatmap_kwargs)
+    if center is not None:
+        ax = sns.heatmap(calendar, center=center, **heatmap_kwargs)
+    else:
+        ax = sns.heatmap(calendar, **heatmap_kwargs)
 
     # Clean up the y and x axes
     ax.set_ylabel('')
