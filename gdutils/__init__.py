@@ -11,8 +11,9 @@ from math import ceil
 import urllib
 from urllib.parse import urlsplit, urlunsplit, quote
 from requests.exceptions import HTTPError, ConnectionError
-import urllib3.exceptions
 from decimal import *
+import requests
+import urllib3
 
 
 class GdacClient(object):
@@ -28,6 +29,9 @@ class GdacClient(object):
         self._page = 1
         self._client = ERDDAP(server=self._erddap_url, protocol=self._protocol, response=self._response_type)
         self._last_request = None
+
+        # DataFrame containing all datasets on the ERDDAP server
+        self._erddap_datasets = pd.DataFrame()
 
         # DataFrame containing the results of ERDDAP advanced search (endpoints, etc.)
         self._datasets_info = pd.DataFrame()
@@ -68,13 +72,21 @@ class GdacClient(object):
                                 'days',
                                 'profiles']
 
+        self.fetch_erddap_datasets()
+
+    @property
+    def erddap_datasets(self):
+        return self._erddap_datasets
+
     @property
     def datasets(self):
         if self._datasets_summaries.empty:
             return pd.DataFrame()
 
-        return self._datasets_summaries.set_index('dataset_id').join(
-            self._datasets_info.set_index('dataset_id')).reset_index()
+        # return self._datasets_summaries.set_index('dataset_id').join(
+        #     self._datasets_info.set_index('dataset_id')).reset_index()
+
+        return self._datasets_summaries.join(self._datasets_info)
 
     @property
     def daily_profile_positions(self):
@@ -90,17 +102,17 @@ class GdacClient(object):
 
     @property
     def dataset_ids(self):
-        if self._datasets_summaries.empty:
-            self._logger.warning('No data sets found')
-            return
+        if self._datasets_info.empty:
+            # self._logger.warning('No data sets found')
+            return []
 
-        return list(self._datasets_info['dataset_id'].values)
+        return list(self._datasets_info.index.values)
 
     @property
     def gliders(self):
         if self._datasets_summaries.empty:
-            self._logger.warning('No data sets found')
-            return
+            # self._logger.warning('No data sets found')
+            return []
 
         return list(self._datasets_summaries.glider.unique())
 
@@ -344,11 +356,32 @@ class GdacClient(object):
     def last_request(self):
         return self._last_request
 
+    def fetch_erddap_datasets(self):
+
+        try:
+
+            self._logger.info('Fetching available server datasets: {:}'.format(self._erddap_url))
+            url = self._client.get_search_url()
+            self._last_request = url
+
+            self._erddap_datasets = pd.read_csv(url)
+
+            # rename columns more friendly
+            columns = {s: s.replace(' ', '_').lower() for s in self._erddap_datasets.columns}
+            self._erddap_datasets.rename(columns=columns, inplace=True)
+
+            # Use dataset_id as the index
+            self._erddap_datasets.set_index('dataset_id', inplace=True)
+
+        except (requests.exceptions.HTTPError, urllib.error.URLError) as e:
+            self._logger.error('Failed to fetch/parse ERDDAP server datasets info: {:} ({:})'.format(url, e))
+            return
+
     def get_glider_datasets(self, glider):
 
         return self.datasets[self.datasets.glider == glider].reset_index().drop('index', axis=1)
 
-    def search_datasets(self, search_for=None, params={}):
+    def search_datasets(self, search_for=None, params={}, dataset_ids=None):
         """Search the ERDDAP server for glider deployment datasets.  Results are stored as pandas DataFrames in:
 
         self.deployments
@@ -358,19 +391,33 @@ class GdacClient(object):
         See the erddapy documentation for valid kwargs"""
 
         url = self._client.get_search_url(search_for=search_for, **params)
+        self._logger.debug(url)
         self._last_request = url
 
         glider_regex = re.compile(r'^(.*)-\d{8}T\d{4}')
+
+        summary_columns = ['glider',
+                           'dataset_id',
+                           'wmo_id',
+                           'start_date',
+                           'end_date',
+                           'deployment_lat',
+                           'deployment_lon',
+                           'lat_min',
+                           'lat_max',
+                           'lon_min',
+                           'lon_max',
+                           'num_profiles',
+                           'days']
+
+        if dataset_ids and not isinstance(dataset_ids, list):
+            dataset_ids = [dataset_ids]
+
         try:
             self._datasets_info = pd.read_csv(url)
             # Drop the allDatasets row
             self._datasets_info.drop(self._datasets_info[self._datasets_info['Dataset ID'] == 'allDatasets'].index,
                                      inplace=True)
-
-            # Reset the index to start and 0
-            self._datasets_info.reset_index(inplace=True)
-            # Drop the index, griddap wms columns
-            self._datasets_info.drop(['index', 'griddap', 'wms'], axis=1, inplace=True)
 
             # rename columns more friendly
             columns = {s: s.replace(' ', '_').lower() for s in self._datasets_info.columns}
@@ -378,114 +425,115 @@ class GdacClient(object):
 
             self._datasets_info = self._datasets_info[~self._datasets_info.dataset_id.str.endswith('delayed')]
 
-            # Iterate through each data set (except for allDatasets) and grab the info page
-            datasets = []
-            daily_profiles = []
-            datasets_days = []
-            avg_profile_pos = []
-            for i, row in self._datasets_info.iterrows():
+            # Reset the index to start and 0
+            self._datasets_info = self._datasets_info.set_index('dataset_id').drop(['griddap', 'wms'], axis=1)
 
-                if row['dataset_id'] == 'allDatasets':
-                    continue
+            if dataset_ids:
+                drop_dataset_ids = [did for did, row in self._datasets_info.iterrows() if did not in dataset_ids]
+                if drop_dataset_ids:
+                    self._datasets_info = self._datasets_info.drop(index=drop_dataset_ids)
 
-                # if delayedmode and not row['dataset_id'].endswith('delayed'):
-                #     continue
-                # elif row['dataset_id'].endswith('delayed'):
-                #     continue
+        except urllib.error.HTTPError as e:
+            self._logger.warning('code={:}: query produced no matching results. (nRows = 0)'.format(e.code))
+        except (requests.exceptions.HTTPError, urllib.error.URLError) as e:
+            self._logger.error('Failed to fetch/parse ERDDAP server datasets info: {:} ({:})'.format(url, e))
+            return
 
-                self._logger.info('Fetching dataset: {:}'.format(row['dataset_id']))
+        if self._datasets_info.empty:
+            self._logger.warning('No datasets found with specified criteria')
+            return
 
-                # Get the data download url for erddap_vars
-                try:
-                    data_url = self._client.get_download_url(dataset_id=row['dataset_id'],
-                                                             variables=self._profiles_variables)
-                except (ConnectionError, ConnectionRefusedError, urllib3.exceptions.MaxRetryError) as e:
-                    self._logger.error('{:} fetch failed: {:}'.format(row['dataset_id'], e))
-                    continue
+        # Iterate through each data set (except for allDatasets) and grab the info page
+        datasets = []
+        daily_profiles = []
+        datasets_days = []
+        avg_profile_pos = []
+        for dataset_id, row in self._datasets_info.iterrows():
 
-                # Fetch the profiles into a pandas dataframe
-                try:
-                    self._logger.debug('GDAC request url: {:}'.format(data_url))
-                    profiles = pd.read_csv(data_url, skiprows=[1], index_col='time', parse_dates=True).sort_index()
-                except HTTPError as e:
-                    self._logger.error('Failed to fetch profiles: {:}'.format(e))
-                    continue
+            self._logger.info('Dataset: {:}'.format(dataset_id))
 
-                # Group the profile by date, average the latitude and longitude and get a daily count
-                profile_stats = profiles.groupby(lambda x: x.date).agg(
-                    {'latitude': 'mean', 'longitude': 'mean', 'profile_id': 'size'}).rename(
-                    columns={'profile_id': 'num_profiles'})
-                profile_stats['dataset_id'] = row.dataset_id
+            # Get the data download url for erddap_vars
+            try:
+                self._logger.debug('Creating download url: {:}'.format(dataset_id))
+                data_url = self._client.get_download_url(dataset_id=dataset_id,
+                                                         variables=self._profiles_variables)
+            except (ConnectionError, ConnectionRefusedError, urllib3.exceptions.MaxRetryError, requests.exceptions.HTTPError) as e:
+                self._logger.error('{:} fetch failed: {:}'.format(dataset_id, e))
+                continue
 
-                s = profile_stats.num_profiles
-                s.name = row['dataset_id']
+            # Fetch the profiles into a pandas dataframe
+            try:
+                self._logger.debug('Fetching download url: {:}'.format(data_url))
+                profiles = pd.read_csv(data_url, skiprows=[1], index_col='time', parse_dates=True).sort_index()
+            except (urllib.error.HTTPError, urllib3.exceptions.ReadTimeoutError, urllib.error.URLError) as e:
+                self._logger.error('Failed to fetch {:} profiles: {:}'.format(dataset_id, e))
+                continue
 
-                avg_profile_pos.append(profile_stats[['dataset_id', 'latitude', 'longitude']])
+            # Group the profile by date, average the latitude and longitude and get a daily count
+            profile_stats = profiles.groupby(lambda x: x.date).agg(
+                {'latitude': 'mean', 'longitude': 'mean', 'profile_id': 'size'}).rename(
+                columns={'profile_id': 'num_profiles'})
+            profile_stats['dataset_id'] = dataset_id
 
-                # # Group profiles by yyyy-mm-dd and sum the number of profiles per day
-                # s = profiles.profile_id.dropna().groupby(lambda x: x.date).count()
-                # s.name = row['dataset_id']
-                daily_profiles.append(s)
+            s = profile_stats.num_profiles
+            s.name = dataset_id
 
-                # Create the deployment date range
-                d_index = pd.date_range(s.index.min(), s.index.max())
-                deployment_days = pd.Series([1 for x in d_index], index=d_index, name=row['dataset_id'])
-                datasets_days.append(deployment_days)
+            avg_profile_pos.append(profile_stats[['dataset_id', 'latitude', 'longitude']])
 
-                glider_match = glider_regex.match(row['dataset_id'])
-                glider = glider_match.groups()[0]
+            daily_profiles.append(s)
 
-                # First profile time
-                dt0 = profiles.index.min()
-                # Last profile time
-                dt1 = profiles.index.max()
-                # Deployment length in days
-                days = ceil((dt1 - dt0).total_seconds() / 86400)
+            # Create the deployment date range
+            d_index = pd.date_range(s.index.min(), s.index.max())
+            deployment_days = pd.Series([1 for x in d_index], index=d_index, name=dataset_id)
+            datasets_days.append(deployment_days)
 
-                dataset_summary = [glider,
-                                   row['dataset_id'],
-                                   str(profiles.wmo_id.unique()[0]),
-                                   dt0,
-                                   dt1,
-                                   profiles.iloc[0]['latitude'],
-                                   profiles.iloc[0]['longitude'],
-                                   profiles.latitude.min(),
-                                   profiles.latitude.max(),
-                                   profiles.longitude.min(),
-                                   profiles.longitude.max(),
-                                   profiles.shape[0],
-                                   days
-                                   ]
+            glider_match = glider_regex.match(dataset_id)
+            glider = glider_match.groups()[0]
 
-                datasets.append(dataset_summary)
+            # First profile time
+            dt0 = profiles.index.min()
+            # Last profile time
+            dt1 = profiles.index.max()
+            # Deployment length in days
+            days = ceil((dt1 - dt0).total_seconds() / 86400)
 
-            columns = ['glider',
-                       'dataset_id',
-                       'wmo_id',
-                       'start_date',
-                       'end_date',
-                       'deployment_lat',
-                       'deployment_lon',
-                       'lat_min',
-                       'lat_max',
-                       'lon_min',
-                       'lon_max',
-                       'num_profiles',
-                       'days']
+            # WMO id
+            wmo_ids = profiles.wmo_id.dropna().astype('int').astype('str')
+            wmo_id = None
+            if not wmo_ids.empty:
+                wmo_id = wmo_ids[0]
 
-            self._datasets_summaries = pd.DataFrame(datasets, columns=columns)
+            dataset_summary = [glider,
+                               dataset_id,
+                               str(wmo_id),
+                               dt0,
+                               dt1,
+                               profiles.iloc[0]['latitude'],
+                               profiles.iloc[0]['longitude'],
+                               profiles.latitude.min(),
+                               profiles.latitude.max(),
+                               profiles.longitude.min(),
+                               profiles.longitude.max(),
+                               profiles.shape[0],
+                               days
+                               ]
 
-            # Create and store the DataFrame containing a 1 on each day the glider was deployed, 0 otherwise
-            self._datasets_days = pd.concat(datasets_days, axis=1).sort_index()
+            datasets.append(dataset_summary)
 
-            # Create and store the DataFrame containing the number of profiles on each day for each deployment
-            self._datasets_profiles = pd.concat(daily_profiles, axis=1).sort_index()
+        if not datasets:
+            self._logger.warning('No datasets returned from search')
+            return
 
-            self._daily_profile_positions = pd.concat(avg_profile_pos, axis=0).reset_index().rename(
-                columns={'index': 'date'})
+        self._datasets_summaries = pd.DataFrame(datasets, columns=summary_columns).set_index('dataset_id')
 
-        except HTTPError as e:
-            self._logger.error(e)
+        # Create and store the DataFrame containing a 1 on each day the glider was deployed, 0 otherwise
+        self._datasets_days = pd.concat(datasets_days, axis=1).sort_index()
+
+        # Create and store the DataFrame containing the number of profiles on each day for each deployment
+        self._datasets_profiles = pd.concat(daily_profiles, axis=1).sort_index()
+
+        self._daily_profile_positions = pd.concat(avg_profile_pos, axis=0).reset_index().rename(
+            columns={'index': 'date'})
 
         return
 
@@ -506,6 +554,9 @@ class GdacClient(object):
 
         calendar = dataset_profiles.dropna().iloc[:, 0].groupby(
             [lambda x: x.year, lambda x: x.month, lambda x: x.day]).count().unstack()
+
+        if calendar.empty:
+            return calendar
 
         # Fill in the missing (yyyy,mm) indices
         years = np.arange(calendar.index.levels[0].min(), calendar.index.levels[0].max() + 1)
@@ -567,11 +618,18 @@ class GdacClient(object):
 
         return calendar
 
+    def check_dataset_exists(self, dataset_id):
+
+        if dataset_id not in self._erddap_datasets.index:
+            return False
+
+        return True
+
     def get_dataset_profiles(self, dataset_id):
         """Fetch all profiles (time, latitude, longitude, profile_id) for the specified dataset.  Profiles are sorted
         by ascending time"""
 
-        if dataset_id not in self.dataset_ids:
+        if dataset_id not in self._erddap_datasets.index:
             self._logger.error('Dataset id {:} not found in {:}'.format(dataset_id, self.__repr__()))
             return pd.DataFrame()
 
@@ -604,7 +662,7 @@ class GdacClient(object):
         min_time: minimum time value formatted as 'YYYY-mm-ddTHH:MM[:SS]'
         max_time: maximum time value formatted as 'YYYY-mm-ddTHH:mm[:SS]'
         """
-        if dataset_id not in self.dataset_ids:
+        if dataset_id not in self._erddap_datasets.index:
             self._logger.error('Dataset id {:} not found in {:}'.format(dataset_id, self.__repr__()))
             return
 
@@ -691,17 +749,14 @@ class GdacClient(object):
 
         return
 
+    @staticmethod
+    def encode_url(data_url):
+        """Percent encode special url characters."""
+        url_pieces = list(urlsplit(data_url))
+        url_pieces[3] = quote(url_pieces[3])
 
-@staticmethod
-def encode_url(data_url):
-    """Percent encode special url characters."""
-    url_pieces = list(urlsplit(data_url))
-    url_pieces[3] = quote(url_pieces[3])
+        return urlunsplit(url_pieces)
 
-    return urlunsplit(url_pieces)
-
-
-def __repr__(self):
-    return "<GdacClient(server='{:}', response='{:}', num_datasets={:})>".format(self._client.server,
-                                                                                 self._client.response,
-                                                                                 len(self._datasets_info))
+    def __repr__(self):
+        return "<GdacClient(server='{:}', num_datasets={:})>".format(self._client.server,
+                                                                     len(self._datasets_info))
