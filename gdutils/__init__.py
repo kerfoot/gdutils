@@ -14,6 +14,7 @@ from requests.exceptions import HTTPError, ConnectionError
 from decimal import *
 import requests
 import urllib3
+from gdutils.dac import latlon_to_geojson_track
 
 
 class GdacClient(object):
@@ -457,7 +458,8 @@ class GdacClient(object):
                 self._logger.debug('Creating download url: {:}'.format(dataset_id))
                 data_url = self._client.get_download_url(dataset_id=dataset_id,
                                                          variables=self._profiles_variables)
-            except (ConnectionError, ConnectionRefusedError, urllib3.exceptions.MaxRetryError, requests.exceptions.HTTPError) as e:
+            except (ConnectionError, ConnectionRefusedError, urllib3.exceptions.MaxRetryError,
+                    requests.exceptions.HTTPError) as e:
                 self._logger.error('{:} fetch failed: {:}'.format(dataset_id, e))
                 continue
 
@@ -748,6 +750,23 @@ class GdacClient(object):
                 json.dump(track, fid)
 
         return
+
+    def get_dataset_track_geojson(self, dataset_id, points=True, precision='0.001'):
+
+        if dataset_id not in self._erddap_datasets.index:
+            self._logger.error('Dataset id {:} not found in {:}'.format(dataset_id, self.__repr__()))
+            return {}
+
+        profiles = self.get_dataset_profiles(dataset_id)
+        if profiles.empty:
+            self._logger.warning('No profiles found for dataset ID: {:}'.format(dataset_id))
+            return {}
+
+        return latlon_to_geojson_track(profiles.latitude,
+                                          profiles.longitude,
+                                          profiles.index,
+                                          include_points=points,
+                                          precision=precision)
 
     @staticmethod
     def encode_url(data_url):
