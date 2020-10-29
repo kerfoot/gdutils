@@ -9,7 +9,8 @@ from gdutils import GdacClient
 
 
 def main(args):
-    """Search the IOOS Glider DAC and return the dataset ids for datasets which have updated within the last 24 hours"""
+    """Search the IOOS Glider DAC and return the dataset ids for all datasets which have updated within the last 24
+    hours"""
 
     # Set up logger
     log_level = getattr(logging, args.loglevel.upper())
