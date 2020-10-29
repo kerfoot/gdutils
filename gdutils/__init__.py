@@ -763,10 +763,10 @@ class GdacClient(object):
             return {}
 
         return latlon_to_geojson_track(profiles.latitude,
-                                          profiles.longitude,
-                                          profiles.index,
-                                          include_points=points,
-                                          precision=precision)
+                                       profiles.longitude,
+                                       profiles.index,
+                                       include_points=points,
+                                       precision=precision)
 
     @staticmethod
     def encode_url(data_url):
