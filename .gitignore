@@ -1,3 +1,4 @@
 *.pyc
 *.profraw
 .idea
+*.DS_Store
