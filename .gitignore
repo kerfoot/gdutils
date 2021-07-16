@@ -3,3 +3,6 @@
 .idea
 *.DS_Store
 *.csv
+*.sh
+.ipynb_checkpoints/
+*.swp
