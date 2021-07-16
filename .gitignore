@@ -2,3 +2,5 @@
 *.profraw
 .idea
 *.DS_Store
+*.csv
+*.sh
