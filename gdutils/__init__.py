@@ -539,6 +539,7 @@ class GdacClient(object):
 
         # Create and store the DataFrame containing the number of profiles on each day for each deployment
         self._datasets_profiles = pd.concat(daily_profiles, axis=1).sort_index()
+        self._datasets_profiles.index = pd.to_datetime(self._datasets_profiles.index)
 
         self._daily_profile_positions = pd.concat(avg_profile_pos, axis=0).reset_index().rename(
             columns={'index': 'date'})
@@ -550,9 +551,9 @@ class GdacClient(object):
 
         if dataset_id not in self.dataset_ids:
             self._logger.error('Dataset id {:} not found in {:}'.format(dataset_id, self.__repr__()))
-            return
+            return pd.DataFrame([])
 
-        info = self._datasets_info[self._datasets_info.dataset_id == dataset_id]
+        info = self._datasets_info.loc[dataset_id]
         info.reset_index(inplace=True)
         return info.drop('index', axis=1).transpose()
 
