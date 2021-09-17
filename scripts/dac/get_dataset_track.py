@@ -6,7 +6,7 @@ import sys
 import json
 import pandas as pd
 from gdutils import GdacClient
-# from gdutils.dac import fetch_dac_catalog
+from gdutils.dac import latlon_to_geojson_track
 
 
 def main(args):
@@ -27,11 +27,21 @@ def main(args):
         logging.warning('Dataset not found: {:}'.format(dataset_id))
         return 1
 
-    if response == 'json':
+    if args.daily:
+        daily_profiles = client.daily_profile_positions[client.daily_profile_positions.dataset_id == dataset_id]
+        track = latlon_to_geojson_track(daily_profiles.latitude, daily_profiles.longitude, daily_profiles.date,
+                                        include_points=True)
+    else:
         track = client.get_dataset_track_geojson(dataset_id)
-        sys.stdout.write('{:}\n'.format(json.dumps(track)))
+
+    if args.metadata:
+        properties = client.datasets.iloc[0].to_dict()
+        properties['dataset_id'] = dataset_id
+        track['features'][0]['properties'] = properties
+
+    if response == 'json':
+        sys.stdout.write('{:}\n'.format(json.dumps(track, default=str)))
     elif response == 'csv':
-        track = client.get_dataset_profiles(dataset_id)
         sys.stdout.write('{:}\n'.format(track.to_csv()))
 
     return 0
@@ -43,6 +53,14 @@ if __name__ == '__main__':
 
     arg_parser.add_argument('dataset_id',
                             help='ERDDAP dataset id')
+
+    arg_parser.add_argument('-d', '--daily',
+                            help='Report one GPS fix per day, averaged from all fixes on that day',
+                            action='store_true')
+
+    arg_parser.add_argument('-m', '--metadata',
+                            help='Include ERDDAP data set metadata',
+                            action='store_true')
 
     arg_parser.add_argument('-f', '--format',
                             help='Response format',
