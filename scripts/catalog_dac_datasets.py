@@ -51,6 +51,10 @@ def main(args):
     dataset_ids = sorted(dataset_ids)
 
     client.search_datasets(dataset_ids=dataset_ids)
+    # Write the search results as a csv file
+    csv_status_path = os.path.join(args.outputdir, '{:}.csv'.format(args.status))
+    logging.info('Writing search results to {:}'.format(csv_status_path))
+    client.datasets.to_csv(csv_status_path)
 
     drop_columns = ['estimated_deploy_date',
                     'estimated_deploy_location',
