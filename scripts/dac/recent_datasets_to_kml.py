@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 Glider DAC geoJSON to KML scratch space
 """
@@ -28,7 +30,7 @@ def main(args):
 
     with open(template, 'r', encoding='latin-1') as fid:
         template = Template(fid.read())
-    
+
     if not json_files:
         logging.warning('No geoJSON files specified')
         return 1
@@ -38,19 +40,19 @@ def main(args):
     tracks = []
     for json_file in json_files:
         with open(json_file, 'r') as fid:
-    
+
             track = json.load(fid)
-    
+
             track['features'][0]['properties']['start_ts'] = track['features'][0]['properties']['start_date'].split('+')[0]
             track['features'][0]['properties']['end_ts'] = track['features'][0]['properties']['end_date'].split('+')[0]
             track['features'][0]['properties']['start_date'] = track['features'][0]['properties']['start_date'].split()[0]
             track['features'][0]['properties']['end_date'] = track['features'][0]['properties']['end_date'].split()[0]
             track['features'][0]['properties']['status_url'] = status_url.format(track['features'][0]['properties']['dataset_id'])
-    
+
             tracks.append(track)
-    
+
     kml = template.render(tracks=tracks)
-    
+
     sys.stdout.write('{:}\n'.format(kml))
 
 
