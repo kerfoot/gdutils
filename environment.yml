@@ -3,48 +3,88 @@ channels:
   - conda-forge
   - defaults
 dependencies:
+  - boost-cpp
   - brotlipy
+  - bzip2
+  - c-ares
   - ca-certificates
+  - cairo
   - cartopy
   - certifi
   - cffi
+  - cfitsio
   - chardet
   - cmocean
   - colorspacious
   - cryptography
+  - curl
   - cycler
   - erddapy
+  - expat
+  - fontconfig
   - freetype
+  - freexl
+  - gdal
   - geos
+  - geotiff
+  - gettext
+  - giflib
+  - glib
+  - hdf4
+  - hdf5
+  - icu
   - idna
+  - jinja2
   - jpeg
+  - json-c
+  - kealib
   - kiwisolver
   - krb5
+  - lcms2
   - libblas
   - libcblas
   - libcurl
   - libcxx
+  - libdap4
   - libedit
+  - libev
   - libffi
+  - libgdal
   - libgfortran
+  - libgfortran4
+  - libiconv
+  - libkml
   - liblapack
+  - libnetcdf
+  - libnghttp2
   - libopenblas
   - libpng
+  - libpq
+  - libspatialite
   - libssh2
   - libtiff
   - libwebp-base
+  - libxml2
   - llvm-openmp
   - lz4-c
+  - markupsafe
   - matplotlib
   - matplotlib-base
   - ncurses
   - numpy
   - olefile
+  - openjpeg
   - openssl
   - owslib
   - pandas
+  - patsy
+  - pcre
   - pillow
   - pip
+  - pixman
+  - poppler
+  - poppler-data
+  - postgresql
   - proj
   - pycparser
   - pyepsg
@@ -64,17 +104,23 @@ dependencies:
   - requests
   - scipy
   - seaborn
+  - seaborn-base
   - setuptools
   - shapely
   - six
   - sqlite
+  - statsmodels
+  - tabulate
+  - tbb
+  - tiledb
   - tk
   - tornado
+  - tzcode
   - urllib3
   - wheel
+  - xerces-c
   - xz
   - yaml
   - zlib
   - zstd
-prefix: /Users/kerfoot/miniconda3/envs/gdutils
-
+prefix: /Users/kerfoot/anaconda3/envs/gdutils
