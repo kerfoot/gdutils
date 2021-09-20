@@ -382,7 +382,7 @@ class GdacClient(object):
 
         return self.datasets[self.datasets.glider == glider].reset_index().drop('index', axis=1)
 
-    def search_datasets(self, search_for=None, params={}, dataset_ids=None):
+    def search_datasets(self, search_for=None, params={}, dataset_ids=None, include_delayed_mode=False):
         """Search the ERDDAP server for glider deployment datasets.  Results are stored as pandas DataFrames in:
 
         self.deployments
@@ -424,7 +424,9 @@ class GdacClient(object):
             columns = {s: s.replace(' ', '_').lower() for s in self._datasets_info.columns}
             self._datasets_info.rename(columns=columns, inplace=True)
 
-            self._datasets_info = self._datasets_info[~self._datasets_info.dataset_id.str.endswith('delayed')]
+            if not include_delayed_mode:
+                self._logger.info('Excluding delayed mode datasets')
+                self._datasets_info = self._datasets_info[~self._datasets_info.dataset_id.str.endswith('delayed')]
 
             # Reset the index to start and 0
             self._datasets_info = self._datasets_info.set_index('dataset_id').drop(['griddap', 'wms'], axis=1)
@@ -466,7 +468,8 @@ class GdacClient(object):
             # Fetch the profiles into a pandas dataframe
             try:
                 self._logger.debug('Fetching download url: {:}'.format(data_url))
-                profiles = pd.read_csv(data_url, skiprows=[1], index_col='time', parse_dates=True).sort_index()
+                profiles = pd.read_csv(data_url, skiprows=[1], index_col='time', parse_dates=True,
+                                       na_values=['none', 'None']).sort_index()
             except (urllib.error.HTTPError, urllib3.exceptions.ReadTimeoutError, urllib.error.URLError) as e:
                 self._logger.error('Failed to fetch {:} profiles: {:}'.format(dataset_id, e))
                 continue
@@ -500,10 +503,13 @@ class GdacClient(object):
             days = ceil((dt1 - dt0).total_seconds() / 86400)
 
             # WMO id
-            wmo_ids = profiles.wmo_id.dropna().astype('int').astype('str')
+            # wmo_ids = profiles.wmo_id.dropna().astype('int').astype('str')
+            wmo_ids = profiles.wmo_id.dropna()
             wmo_id = None
             if not wmo_ids.empty:
-                wmo_id = wmo_ids[0]
+                wmo_id = wmo_ids.astype('int').astype('str')[0]
+            else:
+                self._logger.warning('No WMO id found for {:}'.format(dataset_id))
 
             dataset_summary = [glider,
                                dataset_id,
@@ -533,6 +539,7 @@ class GdacClient(object):
 
         # Create and store the DataFrame containing the number of profiles on each day for each deployment
         self._datasets_profiles = pd.concat(daily_profiles, axis=1).sort_index()
+        self._datasets_profiles.index = pd.to_datetime(self._datasets_profiles.index)
 
         self._daily_profile_positions = pd.concat(avg_profile_pos, axis=0).reset_index().rename(
             columns={'index': 'date'})
@@ -544,9 +551,9 @@ class GdacClient(object):
 
         if dataset_id not in self.dataset_ids:
             self._logger.error('Dataset id {:} not found in {:}'.format(dataset_id, self.__repr__()))
-            return
+            return pd.DataFrame([])
 
-        info = self._datasets_info[self._datasets_info.dataset_id == dataset_id]
+        info = self._datasets_info.loc[dataset_id]
         info.reset_index(inplace=True)
         return info.drop('index', axis=1).transpose()
 
@@ -763,10 +770,20 @@ class GdacClient(object):
             return {}
 
         return latlon_to_geojson_track(profiles.latitude,
-                                          profiles.longitude,
-                                          profiles.index,
-                                          include_points=points,
-                                          precision=precision)
+                                       profiles.longitude,
+                                       profiles.index,
+                                       include_points=points,
+                                       precision=precision)
+
+    def get_dataset_metadata(self, dataset_id):
+
+        try:
+            info_url = self._client.get_info_url(dataset_id)
+            return pd.read_csv(info_url)
+        except (ConnectionError, ConnectionRefusedError, urllib3.exceptions.MaxRetryError,
+                requests.exceptions.HTTPError) as e:
+            self._logger.error(e)
+            return pd.DataFrame([])
 
     @staticmethod
     def encode_url(data_url):
