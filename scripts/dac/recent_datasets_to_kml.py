@@ -4,39 +4,77 @@ Glider DAC geoJSON to KML scratch space
 
 import os
 import json
-import glob
+import sys
 import logging
 from jinja2 import Template
-from pprint import pprint as pp
+import argparse
 
-status_url = 'https://marine.rutgers.edu/cool/data/gliders/dac/status/dataset.php?dataset_id={:}'
-json_path = '/Users/kerfoot/data/gliders/dac/tracks'
-template_path = '/Users/kerfoot/data/gliders/dac/kml/templates/tracks.kml'
 
-with open(template_path, 'r', encoding='latin-1') as fid:
-    template = Template(fid.read())
+def main(args):
+    """
+    Convert the specified geoJSON files to kml and print to stdout
+    """
+    log_level = getattr(logging, args.loglevel.upper())
+    log_format = '%(asctime)s:%(module)s:%(levelname)s:%(message)s [line %(lineno)d]'
+    logging.basicConfig(format=log_format, level=log_level)
 
-json_files = glob.glob(os.path.join(json_path, '*.json'))
-json_files.sort()
+    status_url = 'https://marine.rutgers.edu/cool/data/gliders/dac/status/dataset.php?dataset_id={:}'
+    json_files = args.json_files
+    template = args.template
 
-json_file = json_files[0]
+    if not os.path.isfile(template):
+        logging.error('Invalid kml template specified: {:}'.format(template))
+        return 1
 
-tracks = []
-for json_file in json_files:
-    with open(json_file, 'r') as fid:
+    with open(template, 'r', encoding='latin-1') as fid:
+        template = Template(fid.read())
+    
+    if not json_files:
+        logging.warning('No geoJSON files specified')
+        return 1
 
-        track = json.load(fid)
+    json_files.sort()
 
-        track['features'][0]['properties']['start_ts'] = track['features'][0]['properties']['start_date'].split('+')[0]
-        track['features'][0]['properties']['end_ts'] = track['features'][0]['properties']['end_date'].split('+')[0]
-        track['features'][0]['properties']['start_date'] = track['features'][0]['properties']['start_date'].split()[0]
-        track['features'][0]['properties']['end_date'] = track['features'][0]['properties']['end_date'].split()[0]
-        track['features'][0]['properties']['status_url'] = status_url.format(track['features'][0]['properties']['dataset_id'])
+    tracks = []
+    for json_file in json_files:
+        with open(json_file, 'r') as fid:
+    
+            track = json.load(fid)
+    
+            track['features'][0]['properties']['start_ts'] = track['features'][0]['properties']['start_date'].split('+')[0]
+            track['features'][0]['properties']['end_ts'] = track['features'][0]['properties']['end_date'].split('+')[0]
+            track['features'][0]['properties']['start_date'] = track['features'][0]['properties']['start_date'].split()[0]
+            track['features'][0]['properties']['end_date'] = track['features'][0]['properties']['end_date'].split()[0]
+            track['features'][0]['properties']['status_url'] = status_url.format(track['features'][0]['properties']['dataset_id'])
+    
+            tracks.append(track)
+    
+    kml = template.render(tracks=tracks)
+    
+    sys.stdout.write('{:}\n'.format(kml))
 
-        tracks.append(track)
 
-kml = template.render(tracks=tracks)
+if __name__ == '__main__':
+    arg_parser = argparse.ArgumentParser(description=main.__doc__,
+                                         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-kml_path, kml_file = os.path.split(template_path)
-with open(os.path.join(json_path, 'glider_datasets.kml'), 'w') as fid:
-    fid.write(kml)
+    arg_parser.add_argument('json_files',
+                            nargs='+',
+                            help='geoJSON track files')
+
+    arg_parser.add_argument('-t', '--template',
+                            help='jinja2 kml template file',
+                            default='/home/coolgroup/slocum/dac/kml/tracks_template.kml')
+
+    arg_parser.add_argument('-l', '--loglevel',
+                            help='Verbosity level',
+                            type=str,
+                            choices=['debug', 'info', 'warning', 'error', 'critical'],
+                            default='info')
+
+    parsed_args = arg_parser.parse_args()
+
+    # print(parsed_args)
+    # sys.exit(13)
+
+    sys.exit(main(parsed_args))
