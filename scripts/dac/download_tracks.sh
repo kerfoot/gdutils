@@ -97,11 +97,7 @@ then
     exit 1;
 fi
 
-json_path="${output_dir}/$(date +'%Y%m%dT%H%M%S')_tracks";
-mkdir -m 775 $json_path;
-[ "$?" -ne 0 ] && exit 1;
-
-info_msg "Writing to destination directory: $json_path";
+info_msg "Writing to destination directory: $output_dir";
 
 # Activate the conda environment
 info_msg "Activating conda environment: $conda_env";
@@ -116,7 +112,7 @@ dataset_ids=$(search_datasets.py --hours $hours | grep -v -i dataset | tr '\n' '
 for dataset_id in $dataset_ids
 do
     info_msg "Downloading $dataset_id";
-    json_file="${json_path}/${dataset_id}_track.json";
+    json_file="${output_dir}/${dataset_id}_track.json";
 
     if [ -n "$metadata" ]
     then
