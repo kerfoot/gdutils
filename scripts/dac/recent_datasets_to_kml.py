@@ -39,6 +39,9 @@ def main(args):
 
     tracks = []
     for json_file in json_files:
+
+        logging.info('Processing GeoJSON: {:}'.format(json_file))
+
         with open(json_file, 'r') as fid:
 
             track = json.load(fid)
