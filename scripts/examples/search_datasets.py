@@ -9,8 +9,8 @@ log_format = '%(asctime)s:%(module)s:%(levelname)s:%(message)s [line %(lineno)d]
 logging.basicConfig(format=log_format, level=log_level)
 
 # Search parameters
-dt0 = datetime.datetime(2021, 4, 1, 0, 0, 0)
-dt1 = datetime.datetime(2021, 6, 30, 23, 59, 59)
+dt0 = datetime.datetime(2021, 6, 1, 0, 0, 0)
+dt1 = datetime.datetime(2021, 8, 10, 23, 59, 59)
 north = None
 south = None
 east = None
@@ -80,6 +80,11 @@ for dataset_id, row in datasets.iterrows():
 
     sea_names.append(sea_name)
     funding_sources.append(funding)
+
+    # Count only the days and profiles that are dt0:dt1 inclusive
+    days = client.datasets_days[dataset_id].loc[dt0:dt1].sum()
+    profiles = client.datasets_profiles[dataset_id].loc[dt0:dt1].sum()
+    datasets.loc[dataset_id, ('days', 'num_profiles')] = [days, profiles]
 
 # Add the 2 columns
 datasets['deployment_area'] = sea_names
