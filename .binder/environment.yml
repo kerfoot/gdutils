@@ -8,6 +8,7 @@ dependencies:
   - ipydatetime
   - ipywidgets
   - matplotlib-base
+  - jupyter-offlinenotebook
   - pandas
   - python-dateutil
   - requests
