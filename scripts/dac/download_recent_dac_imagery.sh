@@ -196,7 +196,7 @@ do
     # Create thumbs
     [ -n "$create_latest_profiles_thumbs" ] && info_msg "Creating latest profiles thumbs..." && create_thumbnails.sh $latest_profiles_path;
 
-    # Create lastest time-series imagery
+    # Create latest time-series imagery
     latest_ts_path="${latest_path}/timeseries"; 
     info_msg "Latest time-series path: $latest_ts_path";
     if [ ! -d "$latest_ts_path" ]

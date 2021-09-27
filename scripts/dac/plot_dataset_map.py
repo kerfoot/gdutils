@@ -56,7 +56,7 @@ def main(args):
     if debug:
         logging.info('Image request: {:}'.format(map_url))
     else:
-        logging.info('Requesting and dowloading image {:}'.format(image_name))
+        logging.info('Requesting and downloading image {:}'.format(image_name))
         logging.debug('Image url: {:}'.format(map_url))
         img_path = plotter.download_image(map_url, image_name)
         if img_path:

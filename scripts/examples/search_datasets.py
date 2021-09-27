@@ -37,7 +37,7 @@ client.datasets.to_html()
 # Count the total number of deployments within the dt0:dt1 time window
 num_deployments = client.datasets.shape[0]
 
-# Count the number of glider days withing the dt0:dt1 time window
+# Count the number of glider days within the dt0:dt1 time window
 glider_days = client.glider_days_per_yyyymmdd.loc[dt0:dt1].sum()
 
 # count the number of profiles per dataset
