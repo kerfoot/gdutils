@@ -1,0 +1,8 @@
+ erddapy
+ matplotlib
+ numpy
+ pandas
+ requests
+ seaborn
+ urllib3
+
