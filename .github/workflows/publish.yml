@@ -1,12 +1,6 @@
 name: Publish to PyPI
 
-on:
-  pull_request:
-  push:
-    branches: [master]
-#   release:
-#     types:
-#       - published
+on: ["push", "pull_request"]
 
 jobs:
   packages:
@@ -43,8 +37,9 @@ jobs:
         python -m twine check *
       shell: bash
 
-    # - name: Publish a Python distribution to PyPI
-    #   uses: pypa/gh-action-pypi-publish@master
-    #   with:
-    #     user: __token__
-    #     password: ${{ secrets.PYPI_PASSWORD }}
+    - name: Publish a Python distribution to PyPI
+      if: ${{ github.event_name == 'create' && github.event.ref_type == 'tag' }}
+      uses: pypa/gh-action-pypi-publish@master
+      with:
+        user: __token__
+        password: ${{ secrets.PYPI_PASSWORD }}
