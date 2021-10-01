@@ -26,7 +26,7 @@ class GdacClient(object):
         self._erddap_url = erddap_url or 'https://gliders.ioos.us/erddap'
         self._protocol = 'tabledap'
         self._response_type = 'csv'
-        self._items_per_page = 1e10
+        self._items_per_page = 1e6
         self._page = 1
         self._client = ERDDAP(server=self._erddap_url, protocol=self._protocol, response=self._response_type)
         self._last_request = None
@@ -100,6 +100,14 @@ class GdacClient(object):
     @property
     def datasets_days(self):
         return self._datasets_days
+
+    @datasets_days.setter
+    def datasets_days(self, df):
+        if not isinstance(pd.DataFrame(), pd.core.frame.DataFrame):
+            self._logger.error('Argument must be a pandas DataFrame')
+            return
+
+        self._datasets_days = df
 
     @property
     def dataset_ids(self):
@@ -362,7 +370,7 @@ class GdacClient(object):
         try:
 
             self._logger.info('Fetching available server datasets: {:}'.format(self._erddap_url))
-            url = self._client.get_search_url()
+            url = self._client.get_search_url(items_per_page=self._items_per_page)
             self._last_request = url
 
             self._erddap_datasets = pd.read_csv(url)
@@ -391,7 +399,7 @@ class GdacClient(object):
         Equivalent to ERDDAP's Advanced Search.  Searches can be performed by free text, bounding box, time bounds, etc.
         See the erddapy documentation for valid kwargs"""
 
-        url = self._client.get_search_url(search_for=search_for, **params)
+        url = self._client.get_search_url(items_per_page=self._items_per_page, search_for=search_for, **params)
         self._logger.debug(url)
         self._last_request = url
 
