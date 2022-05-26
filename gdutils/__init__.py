@@ -461,7 +461,7 @@ class GdacClient(object):
         avg_profile_pos = []
         for dataset_id, row in self._datasets_info.iterrows():
 
-            self._logger.info('Dataset: {:}'.format(dataset_id))
+            self._logger.info('Processing dataset {:}'.format(dataset_id))
 
             # Get the data download url for erddap_vars
             try:
@@ -515,7 +515,12 @@ class GdacClient(object):
             wmo_ids = profiles.wmo_id.dropna()
             wmo_id = None
             if not wmo_ids.empty:
-                wmo_id = wmo_ids.astype('int').astype('str')[0]
+                try:
+                    wmo_id = wmo_ids.astype('int').astype('str')[0]
+                except ValueError as e:
+                    self._logger.warning('Invalid WMO id for {:}: {:}'.format(dataset_id, e))
+                    wmo_id = 'Invalid'
+
             else:
                 self._logger.warning('No WMO id found for {:}'.format(dataset_id))
 
