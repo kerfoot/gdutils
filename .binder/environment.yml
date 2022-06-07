@@ -2,7 +2,7 @@ name: gdutils
 channels:
   - conda-forge
 dependencies:
-  - python=3
+  - python=3.10
   # gdutils
   - erddapy
   - ipydatetime
