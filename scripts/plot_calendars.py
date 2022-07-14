@@ -76,6 +76,7 @@ def main(args):
     ax = plot_calendar(calendar)
     ax.set_title('{:} Deployments: {:} - {:}'.format(title, dt0.strftime('%b %d, %Y'), dt1.strftime('%b %d, %Y')))
     img_name = os.path.join(img_path, 'ymd_deployments.png')
+    logging.info('Writing {:}'.format(img_name))
     plt.savefig(img_name, bbox_inches='tight', dpi=300)
 
     # glider days calendar
@@ -83,6 +84,7 @@ def main(args):
     ax = plot_calendar(calendar)
     ax.set_title('{:} Glider Days: {:} - {:}'.format(title, dt0.strftime('%b %d, %Y'), dt1.strftime('%b %d, %Y')))
     img_name = os.path.join(img_path, 'ymd_gliderdays.png')
+    logging.info('Writing {:}'.format(img_name))
     plt.savefig(img_name, bbox_inches='tight', dpi=300)
 
     # profiles calendar
@@ -90,6 +92,7 @@ def main(args):
     ax = plot_calendar(calendar, annot_kws={'fontsize': 6})
     ax.set_title('{:} Profiles: {:} - {:}'.format(title, dt0.strftime('%b %d, %Y'), dt1.strftime('%b %d, %Y')))
     img_name = os.path.join(img_path, 'ymd_profiles.png')
+    logging.info('Writing {:}'.format(img_name))
     plt.savefig(img_name, bbox_inches='tight', dpi=300)
 
     return 0
