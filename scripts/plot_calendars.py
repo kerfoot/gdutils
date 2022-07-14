@@ -102,6 +102,7 @@ if __name__ == '__main__':
                                          formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     arg_parser.add_argument('-o', '--output_path',
+                            dest='img_path',
                             type=str,
                             help='Image write destination (must exist)')
 
