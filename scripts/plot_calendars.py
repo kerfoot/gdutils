@@ -64,9 +64,7 @@ def main(args):
     # Print the data set ids only and exist if -x
     if debug:
         logging.info('{:} data sets matching the search criteria'.format(client.datasets.shape[0]))
-        for dataset_id in client.dataset_ids:
-            sys.stdout.write('{:}\n'.format(dataset_id))
-            return 0
+        return 0
 
     # Set cutoff year month tuples
     ym0 = (dt0.year, dt0.month)
