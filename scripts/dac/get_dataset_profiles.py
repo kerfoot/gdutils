@@ -21,6 +21,7 @@ def main(args):
 
     client = GdacClient()
 
+    logging.info('{:}: Fetching profile time/locations'.format(dataset_id))
     profiles = client.get_dataset_profiles(dataset_id)
     if profiles.empty:
         return 1
