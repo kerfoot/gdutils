@@ -40,7 +40,8 @@ def main(args):
     debug = args.debug
     title = args.title or ''
 
-    img_path = args.img_path
+    img_path = args.img_path or os.path.realpath(os.path.curdir)
+    logging.info('Writing imagery to {:}'.format(img_path))
     if not os.path.isdir(img_path):
         logging.error('Destination does not exist: {:}'.format(img_path))
         return 1
@@ -100,7 +101,7 @@ if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser(description=main.__doc__,
                                          formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    arg_parser.add_argument('img_path',
+    arg_parser.add_argument('-o', '--output_path',
                             type=str,
                             help='Image write destination (must exist)')
 
