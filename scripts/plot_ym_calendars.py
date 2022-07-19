@@ -89,8 +89,12 @@ def main(args):
     plt.savefig(img_name, bbox_inches='tight', dpi=300)
 
     # profiles calendar
-    calendar = client.ym_profiles_calendar.loc[y0:y1,m0:m1]
-    ax = plot_calendar(calendar)
+    calendar = client.ym_profiles_calendar.loc[y0:y1, m0:m1]
+    max_value = calendar.max().max()
+    if max_value > 100:
+        ax = plot_calendar(calendar, annot_kws={'fontsize': 6})
+    else:
+        ax = plot_calendar(calendar)
     ax.set_title('{:} Profiles: {:} - {:}'.format(title, dt0.strftime('%b %d, %Y'), dt1.strftime('%b %d, %Y')))
     img_name = os.path.join(img_path, 'ym_profiles.png')
     logging.info('Writing {:}'.format(img_name))
