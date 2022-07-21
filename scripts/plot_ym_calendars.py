@@ -40,11 +40,14 @@ def main(args):
     debug = args.debug
     title = args.title or ''
 
-    img_path = args.img_path or os.path.realpath(os.path.curdir)
-    logging.info('Writing imagery to {:}'.format(img_path))
-    if not os.path.isdir(img_path):
-        logging.error('Destination does not exist: {:}'.format(img_path))
-        return 1
+    img_path = args.img_path
+    if img_path:
+        logging.info('Writing imagery to {:}'.format(img_path))
+        if not os.path.isdir(img_path):
+            logging.error('Destination does not exist: {:}'.format(img_path))
+            return 1
+    else:
+        logging.info('Printing imagery to the screen')
 
     # Search parameters dict
     params = {'min_time': dt0,
@@ -75,30 +78,44 @@ def main(args):
     # deployments calendar
     calendar = client.ym_deployments_calendar.loc[y0:y1,m0:m1]
     ax = plot_calendar(calendar)
+
     ax.set_title('{:} Deployments: {:} - {:}'.format(title, dt0.strftime('%b %d, %Y'), dt1.strftime('%b %d, %Y')))
-    img_name = os.path.join(img_path, 'ym_deployments.png')
-    logging.info('Writing {:}'.format(img_name))
-    plt.savefig(img_name, bbox_inches='tight', dpi=300)
+
+    if img_path:
+        img_name = os.path.join(img_path, 'ym_deployments.png')
+        logging.info('Writing {:}'.format(img_name))
+        plt.savefig(img_name, bbox_inches='tight', dpi=300)
+    else:
+        plt.show()
 
     # glider days calendar
-    calendar = client.ym_glider_days_calendar.loc[y0:y1,m0:m1]
+    calendar = client.ym_glider_days_calendar.loc[y0:y1, m0:m1]
     ax = plot_calendar(calendar)
+
     ax.set_title('{:} Glider Days: {:} - {:}'.format(title, dt0.strftime('%b %d, %Y'), dt1.strftime('%b %d, %Y')))
-    img_name = os.path.join(img_path, 'ym_gliderdays.png')
-    logging.info('Writing {:}'.format(img_name))
-    plt.savefig(img_name, bbox_inches='tight', dpi=300)
+
+    if img_path:
+        img_name = os.path.join(img_path, 'ym_gliderdays.png')
+        logging.info('Writing {:}'.format(img_name))
+        plt.savefig(img_name, bbox_inches='tight', dpi=300)
+    else:
+        plt.show()
 
     # profiles calendar
     calendar = client.ym_profiles_calendar.loc[y0:y1, m0:m1]
-    max_value = calendar.max().max()
-    if max_value > 100:
-        ax = plot_calendar(calendar, annot_kws={'fontsize': 6})
+    if calendar.shape[1] > 8:
+        ax = plot_calendar(calendar, annot_kws={'fontsize': 8})
     else:
         ax = plot_calendar(calendar)
+
     ax.set_title('{:} Profiles: {:} - {:}'.format(title, dt0.strftime('%b %d, %Y'), dt1.strftime('%b %d, %Y')))
-    img_name = os.path.join(img_path, 'ym_profiles.png')
-    logging.info('Writing {:}'.format(img_name))
-    plt.savefig(img_name, bbox_inches='tight', dpi=300)
+
+    if img_path:
+        img_name = os.path.join(img_path, 'ym_profiles.png')
+        logging.info('Writing {:}'.format(img_name))
+        plt.savefig(img_name, bbox_inches='tight', dpi=300)
+    else:
+        plt.show()
 
     return 0
 
