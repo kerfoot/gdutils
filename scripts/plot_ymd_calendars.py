@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 def main(args):
     """
     Search the IOOS Glider DAC for data sets matching the search criteria and write the deployments, glider days and
-    profiles calendars.
+    profiles calendars. Calendars are displayed as year, month and day.
     """
 
     log_level = getattr(logging, args.loglevel.upper())
@@ -40,11 +40,14 @@ def main(args):
     debug = args.debug
     title = args.title or ''
 
-    img_path = args.img_path or os.path.realpath(os.path.curdir)
-    logging.info('Writing imagery to {:}'.format(img_path))
-    if not os.path.isdir(img_path):
-        logging.error('Destination does not exist: {:}'.format(img_path))
-        return 1
+    img_path = args.img_path
+    if img_path:
+        logging.info('Writing imagery to {:}'.format(img_path))
+        if not os.path.isdir(img_path):
+            logging.error('Destination does not exist: {:}'.format(img_path))
+            return 1
+    else:
+        logging.info('Printing imagery to the screen')
 
     # Search parameters dict
     params = {'min_time': dt0,
@@ -69,31 +72,48 @@ def main(args):
     # Set cutoff year month tuples
     ym0 = (dt0.year, dt0.month)
     ym1 = (dt1.year, dt1.month)
-    # Map month numbers to strings
+
+    # Timestamps for image names
+    date0 = dt0.strftime('%Y%m%dT%H00Z')
+    date1 = dt1.strftime('%Y%m%dT%H00Z')
 
     # deployments calendar
     calendar = client.ymd_deployments_calendar.loc[ym0:ym1]
     ax = plot_calendar(calendar)
     ax.set_title('{:} Deployments: {:} - {:}'.format(title, dt0.strftime('%b %d, %Y'), dt1.strftime('%b %d, %Y')))
-    img_name = os.path.join(img_path, 'ymd_deployments.png')
-    logging.info('Writing {:}'.format(img_name))
-    plt.savefig(img_name, bbox_inches='tight', dpi=300)
+    if img_path:
+        img_name = os.path.join(img_path, 'ymd_deployments_{:}-{:}.png'.format(date0, date1))
+        logging.info('Writing {:}'.format(img_name))
+        plt.savefig(img_name, bbox_inches='tight', dpi=300)
+    else:
+        plt.show()
 
     # glider days calendar
     calendar = client.ymd_glider_days_calendar.loc[ym0:ym1]
     ax = plot_calendar(calendar)
     ax.set_title('{:} Glider Days: {:} - {:}'.format(title, dt0.strftime('%b %d, %Y'), dt1.strftime('%b %d, %Y')))
-    img_name = os.path.join(img_path, 'ymd_gliderdays.png')
-    logging.info('Writing {:}'.format(img_name))
-    plt.savefig(img_name, bbox_inches='tight', dpi=300)
+    if img_path:
+        img_name = os.path.join(img_path, 'ymd_gliderdays_{:}-{:}.png'.format(date0, date1))
+        logging.info('Writing {:}'.format(img_name))
+        plt.savefig(img_name, bbox_inches='tight', dpi=300)
+    else:
+        plt.show()
 
     # profiles calendar
     calendar = client.ymd_profiles_calendar.loc[ym0:ym1]
-    ax = plot_calendar(calendar, annot_kws={'fontsize': 6})
+    if calendar.shape[1] > 8:
+        ax = plot_calendar(calendar, annot_kws={'fontsize': 6})
+    else:
+        ax = plot_calendar(calendar)
+
     ax.set_title('{:} Profiles: {:} - {:}'.format(title, dt0.strftime('%b %d, %Y'), dt1.strftime('%b %d, %Y')))
-    img_name = os.path.join(img_path, 'ymd_profiles.png')
-    logging.info('Writing {:}'.format(img_name))
-    plt.savefig(img_name, bbox_inches='tight', dpi=300)
+
+    if img_path:
+        img_name = os.path.join(img_path, 'ymd_profiles_{:}-{:}.png'.format(date0, date1))
+        logging.info('Writing {:}'.format(img_name))
+        plt.savefig(img_name, bbox_inches='tight', dpi=300)
+    else:
+        plt.show()
 
     return 0
 
@@ -164,7 +184,7 @@ if __name__ == '__main__':
 
     parsed_args = arg_parser.parse_args()
 
-    # print(parsed_args)
-    # sys.exit(13)
+#    print(parsed_args)
+#    sys.exit(13)
 
     sys.exit(main(parsed_args))
