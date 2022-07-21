@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 def main(args):
     """
     Search the IOOS Glider DAC for data sets matching the search criteria and write the deployments, glider days and
-    profiles calendars.
+    profiles calendars. Calendars are displayed as year, month.
     """
 
     log_level = getattr(logging, args.loglevel.upper())
@@ -75,6 +75,10 @@ def main(args):
     m0 = dt0.month
     m1 = dt1.month
 
+    # Timestamps for image names
+    date0 = dt0.strftime('%Y%m%dT%H00Z')
+    date1 = dt1.strftime('%Y%m%dT%H00Z')
+
     # deployments calendar
     calendar = client.ym_deployments_calendar.loc[y0:y1,m0:m1]
     ax = plot_calendar(calendar)
@@ -82,7 +86,7 @@ def main(args):
     ax.set_title('{:} Deployments: {:} - {:}'.format(title, dt0.strftime('%b %d, %Y'), dt1.strftime('%b %d, %Y')))
 
     if img_path:
-        img_name = os.path.join(img_path, 'ym_deployments.png')
+        img_name = os.path.join(img_path, 'ym_deployments_{:}-{:}.png'.format(date0, date1))
         logging.info('Writing {:}'.format(img_name))
         plt.savefig(img_name, bbox_inches='tight', dpi=300)
     else:
@@ -95,7 +99,7 @@ def main(args):
     ax.set_title('{:} Glider Days: {:} - {:}'.format(title, dt0.strftime('%b %d, %Y'), dt1.strftime('%b %d, %Y')))
 
     if img_path:
-        img_name = os.path.join(img_path, 'ym_gliderdays.png')
+        img_name = os.path.join(img_path, 'ym_gliderdays_{:}-{:}.png'.format(date0, date1))
         logging.info('Writing {:}'.format(img_name))
         plt.savefig(img_name, bbox_inches='tight', dpi=300)
     else:
@@ -111,7 +115,7 @@ def main(args):
     ax.set_title('{:} Profiles: {:} - {:}'.format(title, dt0.strftime('%b %d, %Y'), dt1.strftime('%b %d, %Y')))
 
     if img_path:
-        img_name = os.path.join(img_path, 'ym_profiles.png')
+        img_name = os.path.join(img_path, 'ym_profiles_{:}-{:}.png'.format(date0, date1))
         logging.info('Writing {:}'.format(img_name))
         plt.savefig(img_name, bbox_inches='tight', dpi=300)
     else:
