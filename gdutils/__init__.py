@@ -14,7 +14,8 @@ from requests.exceptions import HTTPError, ConnectionError
 from decimal import *
 import requests
 import urllib3
-from gdutils.dac import latlon_to_geojson_track
+from gdutils.apis.dac import fetch_dac_catalog_json
+from gdutils.geojson import latlon_to_geojson_track
 
 
 class GdacClient(object):
@@ -31,16 +32,22 @@ class GdacClient(object):
         self._client = ERDDAP(server=self._erddap_url, protocol=self._protocol, response=self._response_type)
         self._last_request = None
 
-        # DataFrame containing all datasets on the ERDDAP server
+        # DataFrame containing all datasets on the ERDDAP server resulting from an Advanced Search of self._erddap_url
+        # with no parameters specified
         self._erddap_datasets = pd.DataFrame()
 
         # DataFrame containing the results of ERDDAP advanced search (endpoints, etc.)
         self._datasets_info = pd.DataFrame()
-        # DataFrame containing dataset_id, start/end dates, profile count, etc.
+        # DataFrame containing derived parameters (start/end dates, profile count, etc.)
         self._datasets_summaries = pd.DataFrame()
         self._datasets_profiles = pd.DataFrame()
         self._datasets_days = pd.DataFrame()
         self._daily_profile_positions = pd.DataFrame()
+
+        # Store IOOS Glider DAC API data sets results
+        self._api_datasets = pd.DataFrame()
+        # Store the merged self.datasets and self._api_datasets
+        self._merged_datasets = pd.DataFrame()
 
         self._profiles_variables = ['time', 'latitude', 'longitude', 'profile_id', 'wmo_id']
 
@@ -76,16 +83,28 @@ class GdacClient(object):
         self.fetch_erddap_datasets()
 
     @property
+    def merged_datasets(self):
+        """
+        DataFrame containing the merged API/self.datasets records
+        """
+
+        return self._merged_datasets
+
+    @property
     def erddap_datasets(self):
+        """
+        DataFrame containing all data sets resulting from the Advanced Search with no parameters. All data sets on the
+        ERDDAP server are returned.
+        """
         return self._erddap_datasets
 
     @property
     def datasets(self):
+        """
+        DataFrame resulting from the joining of self._datasets_summaries and self._datasets_info
+        """
         if self._datasets_summaries.empty:
             return pd.DataFrame()
-
-        # return self._datasets_summaries.set_index('dataset_id').join(
-        #     self._datasets_info.set_index('dataset_id')).reset_index()
 
         return self._datasets_summaries.join(self._datasets_info)
 
@@ -366,6 +385,12 @@ class GdacClient(object):
         return self._last_request
 
     def fetch_erddap_datasets(self):
+        """
+        ERDDAP Advanced search to return all available data sets.  The url is contained in self._erddap_url
+
+        :return:
+        self.erddap_datasets: Pandas DataFrame containing the result of the Advanced Search
+        """
 
         try:
 
@@ -384,13 +409,13 @@ class GdacClient(object):
 
         except (requests.exceptions.HTTPError, urllib.error.URLError) as e:
             self._logger.error('Failed to fetch/parse ERDDAP server datasets info: {:} ({:})'.format(url, e))
-            return
+            return pd.DataFrame()
 
     def get_glider_datasets(self, glider):
 
-        return self.datasets[self.datasets.glider == glider].reset_index().drop('index', axis=1)
+        return self.datasets[self.datasets.glider == glider]
 
-    def search_datasets(self, search_for=None, params={}, dataset_ids=None, include_delayed_mode=False):
+    def search_datasets(self, params={}, dataset_ids=None, include_delayed_mode=False):
         """Search the ERDDAP server for glider deployment datasets.  Results are stored as pandas DataFrames in:
 
         self.deployments
@@ -399,7 +424,7 @@ class GdacClient(object):
         Equivalent to ERDDAP's Advanced Search.  Searches can be performed by free text, bounding box, time bounds, etc.
         See the erddapy documentation for valid kwargs"""
 
-        url = self._client.get_search_url(items_per_page=self._items_per_page, search_for=search_for, **params)
+        url = self._client.get_search_url(items_per_page=self._items_per_page, **params)
         self._logger.debug(url)
         self._last_request = url
 
@@ -437,7 +462,8 @@ class GdacClient(object):
                 self._datasets_info = self._datasets_info[~self._datasets_info.dataset_id.str.endswith('delayed')]
 
             # Reset the index to start and 0
-            self._datasets_info = self._datasets_info.set_index('dataset_id').drop(['griddap', 'wms'], axis=1)
+            self._datasets_info = self._datasets_info.set_index('dataset_id').drop(['griddap', 'wms'], axis=1).replace(
+                ['None', None], False)
 
             if dataset_ids:
                 drop_dataset_ids = [did for did, row in self._datasets_info.iterrows() if did not in dataset_ids]
@@ -513,13 +539,12 @@ class GdacClient(object):
             # WMO id
             # wmo_ids = profiles.wmo_id.dropna().astype('int').astype('str')
             wmo_ids = profiles.wmo_id.dropna()
-            wmo_id = None
+            wmo_id = ''
             if not wmo_ids.empty:
                 try:
                     wmo_id = wmo_ids.astype('int').astype('str')[0]
                 except ValueError as e:
                     self._logger.warning('Invalid WMO id for {:}: {:}'.format(dataset_id, e))
-                    wmo_id = 'Invalid'
 
             else:
                 self._logger.warning('No WMO id found for {:}'.format(dataset_id))
@@ -545,7 +570,8 @@ class GdacClient(object):
             self._logger.warning('No datasets returned from search')
             return
 
-        self._datasets_summaries = pd.DataFrame(datasets, columns=summary_columns).set_index('dataset_id')
+        self._datasets_summaries = pd.DataFrame(datasets, columns=summary_columns).set_index('dataset_id').replace(
+            ['None', None], False)
 
         # Create and store the DataFrame containing a 1 on each day the glider was deployed, 0 otherwise
         self._datasets_days = pd.concat(datasets_days, axis=1).sort_index()
@@ -571,7 +597,13 @@ class GdacClient(object):
         return info.drop('index', axis=1).transpose()
 
     def get_dataset_ymd_profiles_calendar(self, dataset_id):
+        """
+        Return the year/month/day profiles calendar for the specified dataset_id, which must have been returned by
+        self.search_datasets.
 
+        :param dataset_id: ERDDAP dataset ID
+        :return: year/month/day calendar suitable for plotting with gdutils.plot.plot_calendar
+        """
         dataset_profiles = self.get_dataset_profiles(dataset_id)
 
         calendar = dataset_profiles.dropna().iloc[:, 0].groupby(
@@ -598,7 +630,13 @@ class GdacClient(object):
         return calendar
 
     def get_dataset_ym_profiles_calendar(self, dataset_id):
+        """
+        Return the year/month profiles calendar for the specified dataset_id, which must have been returned by
+        self.search_datasets.
 
+        :param dataset_id: ERDDAP dataset ID
+        :return: year/month calendar suitable for plotting with gdutils.plot.plot_calendar
+        """
         dataset_profiles = self.get_dataset_profiles(dataset_id)
 
         calendar = dataset_profiles.dropna().iloc[:, 0].groupby(
@@ -620,6 +658,13 @@ class GdacClient(object):
         return calendar
 
     def get_dataset_md_profiles_calendar(self, dataset_id):
+        """
+        Return the month/day profiles calendar for the specified dataset_id, which must have been returned by
+        self.search_datasets.
+
+        :param dataset_id: ERDDAP dataset ID
+        :return: month/day calendar suitable for plotting with gdutils.plot.plot_calendar
+        """
 
         dataset_profiles = self.get_dataset_profiles(dataset_id)
 
@@ -648,8 +693,10 @@ class GdacClient(object):
         return True
 
     def get_dataset_profiles(self, dataset_id):
-        """Fetch all profiles (time, latitude, longitude, profile_id) for the specified dataset.  Profiles are sorted
-        by ascending time"""
+        """
+        Fetch all profiles (time, latitude, longitude, profile_id) for the specified dataset.  Profiles are sorted
+        by ascending time
+        """
 
         if dataset_id not in self._erddap_datasets.index:
             self._logger.error('Dataset id {:} not found in {:}'.format(dataset_id, self.__repr__()))
@@ -669,8 +716,7 @@ class GdacClient(object):
             self._logger.error('Dataset id {:} not found in {:}'.format(dataset_id, self.__repr__()))
             return
 
-        return self._datasets_summaries[['dataset_id', 'start_date', 'end_date', 'wmo_id']].iloc[
-            self.dataset_ids.index(dataset_id)]
+        return self._datasets_summaries[['start_date', 'end_date', 'wmo_id']].loc[dataset_id]
 
     def get_dataset_time_series(self, dataset_id, variables, min_time=None, max_time=None):
         """Fetch the variables time-series for the specified dataset_id.  A time window can be specified using min_time
@@ -704,6 +750,8 @@ class GdacClient(object):
         # characters prior to sending the data request.
         data_url = self.encode_url(
             self._client.get_download_url(dataset_id=dataset_id, variables=variables, constraints=constraints))
+
+        self._last_request = data_url
 
         return pd.read_csv(data_url, skiprows=[1], parse_dates=True).set_index('precise_time').sort_index()
 
@@ -797,6 +845,53 @@ class GdacClient(object):
                 requests.exceptions.HTTPError) as e:
             self._logger.error(e)
             return pd.DataFrame([])
+
+    def get_api_datasets(self):
+        """
+        Fetch all data sets registered at the U.S IOOS Glider DAC.  The url is stored in gdutils.dac.dac_catalog_url
+
+        :return:
+        api_datasets: DataFrame containing the registered data sets
+        """
+
+        datasets_json = fetch_dac_catalog_json()
+
+        # self._api_datasets = pd.DataFrame(datasets_json).set_index('name').replace(['None', None, ''], np.nan)
+        self._api_datasets = pd.DataFrame(datasets_json).set_index('name')
+
+        boolean_vars = ['archive_safe',
+                        'completed',
+                        'compliance_check_passed',
+                        'delayed_mode']
+
+        for boolean_var in boolean_vars:
+            self._api_datasets[boolean_var] = self._api_datasets[boolean_var].fillna(False)
+
+        return self._api_datasets
+
+    def merge_with_api(self, merge_all=True):
+        """
+        Create a DataFrame containing the inner join of the self._api_datasets and self.datasets and store in
+        self.merged_datasets
+        """
+        _ = self.get_api_datasets()
+
+        if self._api_datasets.empty:
+            self._logger.warning('No API registered data sets found')
+            return pd.DataFrame()
+
+        if not merge_all:
+            self._merged_datasets = self._api_datasets.drop(columns=['wmo_id']).merge(self.datasets, how='right',
+                                                                                      left_index=True,
+                                                                                      right_index=True)
+        else:
+            self._merged_datasets = self._api_datasets.drop(columns=['wmo_id']).merge(self.datasets, how='left',
+                                                                                      left_index=True,
+                                                                                      right_index=True)
+        self._merged_datasets['orphaned'] = True
+        self._merged_datasets['orphaned'].where(self._merged_datasets.tabledap.isnull(), False, inplace=True)
+
+        # self._merged_datasets.replace(['None', None], np.nan)
 
     @staticmethod
     def encode_url(data_url):
