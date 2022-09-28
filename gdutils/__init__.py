@@ -14,6 +14,7 @@ from requests.exceptions import HTTPError, ConnectionError
 from decimal import *
 import requests
 import urllib3
+import io
 from gdutils.apis.dac import fetch_dac_catalog_json
 from gdutils.geojson import latlon_to_geojson_track
 
@@ -31,6 +32,7 @@ class GdacClient(object):
         self._page = 1
         self._client = ERDDAP(server=self._erddap_url, protocol=self._protocol, response=self._response_type)
         self._last_request = None
+        self._timeout = (30, None)
 
         # DataFrame containing all datasets on the ERDDAP server resulting from an Advanced Search of self._erddap_url
         # with no parameters specified
@@ -49,7 +51,10 @@ class GdacClient(object):
         # Store the merged self.datasets and self._api_datasets
         self._merged_datasets = pd.DataFrame()
 
-        self._profiles_variables = ['time', 'latitude', 'longitude', 'profile_id', 'wmo_id']
+        self._profiles_variables = ['time',
+                                    'latitude',
+                                    'longitude',
+                                    'profile_id']
 
         self._valid_search_kwargs = {'institution',
                                      'ioos_category',
@@ -413,7 +418,58 @@ class GdacClient(object):
 
     def get_glider_datasets(self, glider):
 
-        return self.datasets[self.datasets.glider == glider]
+        try:
+            if self.datasets.empty:
+                self._logger.warning('No data set searched performed. Grabbing gliders from self.erddap_datasets')
+                return self._erddap_datasets[self._erddap_datasets.index.str.startswith(glider)]
+            else:
+                return self.datasets[self.datasets.glider == glider]
+        except AttributeError as e:
+            self._logger.error('No data sets found for glider {:} ({:})'.format(glider, e))
+            return pd.DataFrame([])
+
+    def get_dataset_wmo_id(self, dataset_id):
+        """
+        Fetch the WMO ID, if assigned and valid, for the specified dataset_id
+
+        :param dataset_id: valid ERDDAP dataset id
+        :return: Valid WMO ID or empty string
+        """
+
+        wmo_id = None
+        if dataset_id not in self._erddap_datasets.index:
+            self._logger.warning('Cannot fetch WMO id for invalid dataset id {:}'.format(dataset_id))
+            return wmo_id
+
+        # WMO id
+        self._logger.info('Fetching {:} WMO ID'.format(dataset_id))
+        wmo_id_url = '{:}&distinct()'.format(self.e.get_download_url(dataset_id, variables=['wmo_id']))
+        self._last_request = wmo_id_url
+        try:
+            self._logger.debug('wmo id GET: {:}'.format(self._last_request))
+            r = requests.get(wmo_id_url, timeout=self._timeout, stream=True)
+            if r.status_code != 200:
+                self._logger.error('Request failed [reason={:}, code={:}]'.format(r.reason, r.status_code))
+                self._logger.error('Request: {:}'.format(wmo_id_url))
+                return None
+
+            wmo_ids = pd.read_csv(io.StringIO(r.text), skiprows=[1])
+            if wmo_ids.empty:
+                self._logger.warning('No WMO ID found for {:}'.format(dataset_id))
+            elif wmo_ids.shape[0] > 1:
+                self._logger.warning('Multiple WMO IDs found for {:}'.format(dataset_id))
+            else:
+                wmo_id = wmo_ids.iloc[0].values.astype('int').astype('str')[0]
+                self._logger.info('WMO id harvested in {:0.1f} seconds'.format(r.elapsed.total_seconds()))
+
+        except requests.exceptions.RequestException as e:
+            self._logger.error('Failed to fetch WMO ID for {:}: reason={:}'.format(dataset_id, e))
+            return None
+        except ValueError as e:
+            self._logger.warning('Invalid WMO id {:} for {:}: {:}'.format(wmo_id, dataset_id, e))
+            return None
+
+        return wmo_id
 
     def search_datasets(self, params={}, dataset_ids=None, include_delayed_mode=False):
         """Search the ERDDAP server for glider deployment datasets.  Results are stored as pandas DataFrames in:
@@ -487,7 +543,13 @@ class GdacClient(object):
         avg_profile_pos = []
         for dataset_id, row in self._datasets_info.iterrows():
 
-            self._logger.info('Processing dataset {:}'.format(dataset_id))
+            # Fetch the WMO id for this dataset, if there is one
+            wmo_id = self.get_dataset_wmo_id(dataset_id)
+            if not wmo_id:
+                wmo_id = ''
+
+            # Harvest all of the profiles contained in the data set (contained in self._profile_variables).
+            self._logger.info('Harvesting {:} profiles'.format(dataset_id))
 
             # Get the data download url for erddap_vars
             try:
@@ -535,19 +597,6 @@ class GdacClient(object):
             dt1 = profiles.index.max()
             # Deployment length in days
             days = ceil((dt1 - dt0).total_seconds() / 86400)
-
-            # WMO id
-            # wmo_ids = profiles.wmo_id.dropna().astype('int').astype('str')
-            wmo_ids = profiles.wmo_id.dropna()
-            wmo_id = ''
-            if not wmo_ids.empty:
-                try:
-                    wmo_id = wmo_ids.astype('int').astype('str')[0]
-                except ValueError as e:
-                    self._logger.warning('Invalid WMO id for {:}: {:}'.format(dataset_id, e))
-
-            else:
-                self._logger.warning('No WMO id found for {:}'.format(dataset_id))
 
             dataset_summary = [glider,
                                dataset_id,
