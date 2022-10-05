@@ -8,20 +8,22 @@ dac_catalog_url = 'https://gliders.ioos.us/providers/api/deployment'
 logging.getLogger(__file__)
 
 
-def fetch_dac_catalog():
-
-    try:
-        r = requests.get(dac_catalog_url, timeout=60)
-    except requests.exceptions.ReadTimeout as e:
-        logging.error(e)
-        return []
-
-    if r.status_code == 200:
-        return r.json()['results']
-
-    logging.error('Failed to fetch DAC registered deployments: {:}'.format(r.reason))
-
-    return []
+#def fetch_dac_catalog():
+#
+#    logging.info('Fetching API registered data sets at {:}'.format(dac_catalog_url))
+#
+#    try:
+#        r = requests.get(dac_catalog_url, timeout=60)
+#    except requests.exceptions.ReadTimeout as e:
+#        logging.error(e)
+#        return []
+#
+#    if r.status_code == 200:
+#        return r.json()['results']
+#
+#    logging.error('Failed to fetch DAC registered deployments: {:}'.format(r.reason))
+#
+#    return []
 
 
 def latlon_to_geojson_track(latitudes, longitudes, timestamps, include_points=True, precision='0.001'):
@@ -46,7 +48,6 @@ def latlon_to_linestring(latitudes, longitudes, timestamps, precision='0.001'):
     dataset_gps['longitude'] = longitudes.values
 
     track = {'type': 'Feature',
-             # 'bbox': bbox,
              'geometry': {'type': 'LineString',
                           'coordinates': [
                               [float(Decimal(pos.longitude).quantize(Decimal(precision),
