@@ -6,7 +6,7 @@ import sys
 import json
 import pandas as pd
 from gdutils import GdacClient
-from gdutils.dac import latlon_to_geojson_track
+from gdutils.geojson import latlon_to_geojson_track
 
 
 def main(args):
